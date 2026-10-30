@@ -37,7 +37,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.matlauncher.app.MainActivity
 import com.matlauncher.app.ai.AiHost
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.platform.LocalView
 import com.matlauncher.app.data.AppInfo
+import com.matlauncher.app.data.HomeItem
+import com.matlauncher.app.data.HomeKind
+import com.matlauncher.app.util.UpdateState
+import com.matlauncher.app.util.Updater
 import com.matlauncher.app.util.ImageTools
 import com.matlauncher.app.util.SystemControls
 import com.matlauncher.app.util.WallpaperTools
@@ -49,7 +57,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Overlay { None, Drawer, Control, Ai, Settings, HomeMenu }
+enum class Overlay { None, Drawer, Control, Ai, Settings, HomeMenu, Widgets }
 
 @Composable
 fun MatApp(activity: MainActivity) {
@@ -67,6 +75,37 @@ fun MatApp(activity: MainActivity) {
     var pendingIconApp by remember { mutableStateOf<AppInfo?>(null) }
     var launching by remember { mutableStateOf<LaunchRequest?>(null) }
     val sys = remember { SystemControls(ctx) }
+    var editing by remember { mutableStateOf(false) }
+    val updater = remember { Updater() }
+    var updateNotice by remember { mutableStateOf(false) }
+
+    val addHosted = rememberWidgetAdder(activity.widgetHost) { id, _ ->
+        settings.setHomeItems(settings.homeItems + HomeItem(HomeKind.HOSTED, id))
+        overlay = Overlay.None
+        editing = true
+    }
+
+    // status bar: optionally hidden for a cleaner home screen
+    val view = LocalView.current
+    LaunchedEffect(settings.hideStatusBar) {
+        val c = WindowCompat.getInsetsController(activity.window, view)
+        if (settings.hideStatusBar) {
+            c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            c.hide(WindowInsetsCompat.Type.statusBars())
+        } else {
+            c.show(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    // quiet update check at most twice a day
+    LaunchedEffect(Unit) {
+        if (settings.autoUpdateCheck && System.currentTimeMillis() - settings.lastUpdateCheck > 12 * 3_600_000L) {
+            delay(4000)
+            settings.lastUpdateCheck = System.currentTimeMillis()
+            updater.check(ctx)
+            if (updater.state is UpdateState.Available) updateNotice = true
+        }
+    }
 
     DisposableEffect(Unit) {
         sys.start()
@@ -160,6 +199,8 @@ fun MatApp(activity: MainActivity) {
             openDrawer = { overlay = Overlay.Drawer },
             openControl = { overlay = Overlay.Control },
             openHomeMenu = { overlay = Overlay.HomeMenu },
+            openWidgetPicker = { overlay = Overlay.Widgets },
+            editHome = { overlay = Overlay.None; editing = true },
             openAi = { aiQuery = null; overlay = Overlay.Ai },
             openSettings = { overlay = Overlay.Settings },
             closeOverlay = { overlay = Overlay.None },
@@ -219,8 +260,10 @@ fun MatApp(activity: MainActivity) {
     val locked by activity.locked
 
     val onboarded = settings.onboarded
-    BackHandler(enabled = locked || overlay != Overlay.None || !onboarded) {
-        if (!locked) overlay = Overlay.None
+    BackHandler(enabled = locked || overlay != Overlay.None || !onboarded || editing) {
+        if (!locked) {
+            if (overlay != Overlay.None) overlay = Overlay.None else editing = false
+        }
     }
 
     val homeScale by animateFloatAsState(if (onboarded) 1f else 0.92f, tween(650), label = "homeScale")
@@ -229,7 +272,10 @@ fun MatApp(activity: MainActivity) {
     MatTheme(seed = activity.wallpaperSeed.value) {
         Box(Modifier.fillMaxSize()) {
           Box(Modifier.fillMaxSize().graphicsLayer { scaleX = homeScale; scaleY = homeScale; alpha = homeAlpha }) {
-            HomeScreen(repo.apps, settings, weather, actions, activity.homeSignal.intValue, activity.widgetHost)
+            HomeScreen(
+                repo.apps, settings, weather, actions, activity.homeSignal.intValue, activity.widgetHost,
+                editing = editing, onEditingChange = { editing = it },
+            )
 
             AnimatedVisibility(
                 visible = overlay == Overlay.Drawer,
@@ -244,7 +290,7 @@ fun MatApp(activity: MainActivity) {
                 enter = slideInVertically(tween(260)) { -it } + fadeIn(),
                 exit = slideOutVertically(tween(220)) { -it } + fadeOut(),
             ) {
-                ControlCenter(sys, actions)
+                ControlCenter(sys, settings, actions)
             }
 
             AnimatedVisibility(
@@ -260,7 +306,7 @@ fun MatApp(activity: MainActivity) {
                 enter = slideInVertically(tween(260)) { it } + fadeIn(),
                 exit = slideOutVertically(tween(220)) { it } + fadeOut(),
             ) {
-                SettingsScreen(repo.apps, settings, actions, weatherInstalled, onBack = { overlay = Overlay.None })
+                SettingsScreen(repo.apps, settings, actions, weatherInstalled, updater, onBack = { overlay = Overlay.None })
             }
 
             AnimatedVisibility(
@@ -269,6 +315,23 @@ fun MatApp(activity: MainActivity) {
                 exit = slideOutVertically(tween(200)) { it / 2 } + fadeOut(),
             ) {
                 HomeMenu(settings, actions)
+            }
+
+            AnimatedVisibility(
+                visible = overlay == Overlay.Widgets,
+                enter = slideInVertically(tween(260)) { it } + fadeIn(),
+                exit = slideOutVertically(tween(220)) { it } + fadeOut(),
+            ) {
+                WidgetPicker(
+                    settings = settings,
+                    onClose = { overlay = Overlay.None },
+                    onPickHosted = { info -> addHosted(info) },
+                    onPickBuiltin = { kind ->
+                        settings.setBuiltin(kind, true)
+                        overlay = Overlay.None
+                        editing = true
+                    },
+                )
             }
 
             AnimatedVisibility(
@@ -304,6 +367,18 @@ fun MatApp(activity: MainActivity) {
                         TextButton(onClick = { showInstall = false; WeatherInstaller.install(ctx) }) { Text("Install") }
                     },
                     dismissButton = { TextButton(onClick = { showInstall = false }) { Text("Not now") } },
+                )
+            }
+            if (updateNotice) {
+                val info = (updater.state as? UpdateState.Available)?.info
+                AlertDialog(
+                    onDismissRequest = { updateNotice = false },
+                    title = { Text("Update available") },
+                    text = { Text("Mat Launcher ${info?.version ?: ""} is ready. Open Settings → Updates to install it.") },
+                    confirmButton = {
+                        TextButton(onClick = { updateNotice = false; overlay = Overlay.Settings }) { Text("Open settings") }
+                    },
+                    dismissButton = { TextButton(onClick = { updateNotice = false }) { Text("Later") } },
                 )
             }
             launching?.let { req ->

@@ -98,19 +98,81 @@ class LauncherSettings(private val context: Context) {
     var gridColumns by intPref("gridColumns", 4)
 
     // ---- home ----
-    var showClock by boolPref("showClock", true)
-    var showWeather by boolPref("showWeather", true)
-    var showPhoto by boolPref("showPhoto", true)
-    var clockAnalog by boolPref("clockAnalog", false)
     var clockStyle by enumPref("clockStyle", ClockStyle.STACKED, ClockStyle.values())
     var weatherStyle by enumPref("weatherStyle", WeatherStyle.CARD, WeatherStyle.values())
     var photoShape by enumPref("photoShape", PhotoShape.ROUNDED, PhotoShape.values())
     var onboarded by boolPref("onboarded", false)
 
-    // ---- hosted (third party) widgets ----
-    private var widgetIdsRaw by stringPref("widgetIds", "")
-    val widgetIds: List<Int> get() = split(widgetIdsRaw).mapNotNull { it.toIntOrNull() }
-    fun setWidgetIds(list: List<Int>) { widgetIdsRaw = list.joinToString("|") }
+    // ---- home layout: ordered list of built-in and app widgets ----
+    private var layoutRaw by stringPref("homeLayout", initialLayout())
+
+    val homeItems: List<HomeItem> get() = HomeItem.parse(layoutRaw)
+    fun setHomeItems(list: List<HomeItem>) { layoutRaw = HomeItem.join(list) }
+
+    fun hasBuiltin(kind: HomeKind): Boolean = homeItems.any { it.kind == kind }
+
+    fun setBuiltin(kind: HomeKind, on: Boolean) {
+        val cur = homeItems
+        if (on && cur.none { it.kind == kind }) setHomeItems(cur + defaultItem(kind))
+        else if (!on) setHomeItems(cur.filter { it.kind != kind })
+    }
+
+    var showClock: Boolean
+        get() = hasBuiltin(HomeKind.CLOCK)
+        set(v) = setBuiltin(HomeKind.CLOCK, v)
+    var showWeather: Boolean
+        get() = hasBuiltin(HomeKind.WEATHER)
+        set(v) = setBuiltin(HomeKind.WEATHER, v)
+    var showPhoto: Boolean
+        get() = hasBuiltin(HomeKind.PHOTO)
+        set(v) = setBuiltin(HomeKind.PHOTO, v)
+
+    fun resetLayout() { layoutRaw = initialLayout(ignoreSaved = true) }
+
+    private fun defaultItem(kind: HomeKind): HomeItem = when (kind) {
+        HomeKind.CLOCK -> HomeItem(kind, half = true)
+        HomeKind.WEATHER -> HomeItem(kind, half = weatherStyle == WeatherStyle.CARD)
+        else -> HomeItem(kind)
+    }
+
+    /** Fresh install: weather + clock + photos + Ask Mat AI. Upgrades keep what the user had. */
+    private fun initialLayout(ignoreSaved: Boolean = false): String {
+        val items = mutableListOf<HomeItem>()
+        val legacy = !ignoreSaved
+        if (!legacy || sp.getBoolean("showWeather", true)) items += defaultItem(HomeKind.WEATHER)
+        if (!legacy || sp.getBoolean("showClock", true)) items += defaultItem(HomeKind.CLOCK)
+        if (!legacy || sp.getBoolean("showPhoto", true)) items += defaultItem(HomeKind.PHOTO)
+        items += defaultItem(HomeKind.AI)
+        if (legacy) {
+            split(sp.getString("widgetIds", "") ?: "").mapNotNull { it.toIntOrNull() }.forEach {
+                items += HomeItem(HomeKind.HOSTED, it)
+            }
+        }
+        return HomeItem.join(items)
+    }
+
+    // ---- top bar (date + weather header and the status bar) ----
+    var topBarShow by boolPref("topBarShow", true)
+    var topBarDate by boolPref("topBarDate", true)
+    var topBarWeather by boolPref("topBarWeather", true)
+    var topBarAlign by enumPref("topBarAlign", HAlign.START, HAlign.values())
+    var topBarSize by enumPref("topBarSize", TextScale.MEDIUM, TextScale.values())
+    var topBarDateStyle by enumPref("topBarDateStyle", DateStyle.SHORT, DateStyle.values())
+    var hideStatusBar by boolPref("hideStatusBar", false)
+
+    // ---- control center ----
+    private var ccTilesRaw by stringPref("ccTiles", "INTERNET|BLUETOOTH|FLASHLIGHT|AIRPLANE|ROTATION|DND|LOCATION|AI")
+    val ccTiles: List<TileId> get() = TileId.parse(ccTilesRaw)
+    fun setCcTiles(list: List<TileId>) { ccTilesRaw = TileId.join(list) }
+    var ccStyle by enumPref("ccStyle", CcStyle.LARGE, CcStyle.values())
+    var ccShowHeader by boolPref("ccShowHeader", true)
+    var ccShowBrightness by boolPref("ccShowBrightness", true)
+    var ccShowVolume by boolPref("ccShowVolume", true)
+    var ccShowShortcuts by boolPref("ccShowShortcuts", true)
+
+    // ---- updates ----
+    var autoUpdateCheck by boolPref("autoUpdateCheck", true)
+    var lastUpdateCheck by StatePref(sp, "lastUpdateCheck", 0L, { k, v -> putLong(k, v) }, { k, d -> getLong(k, d) })
 
     // ---- weather ----
     var cityName by stringPref("cityName", "New York")
@@ -121,6 +183,16 @@ class LauncherSettings(private val context: Context) {
     // ---- lock ----
     var lockEnabled by boolPref("lockEnabled", false)
     var lockOnScreenOff by boolPref("lockOnScreenOff", true)
+    var lockBackground by enumPref("lockBackground", LockBackground.GRADIENT, LockBackground.values())
+    var lockClockStyle by enumPref("lockClockStyle", LockClockStyle.STACKED, LockClockStyle.values())
+    var lockAlign by enumPref("lockAlign", HAlign.START, HAlign.values())
+    var lockShowDate by boolPref("lockShowDate", true)
+    var lockShowNotifs by boolPref("lockShowNotifs", true)
+    var lockMaxNotifs by intPref("lockMaxNotifs", 5)
+    var lockShowToggles by boolPref("lockShowToggles", true)
+    private var lockTilesRaw by stringPref("lockTiles", "INTERNET|BLUETOOTH|FLASHLIGHT|AIRPLANE")
+    val lockTiles: List<TileId> get() = TileId.parse(lockTilesRaw)
+    fun setLockTiles(list: List<TileId>) { lockTilesRaw = TileId.join(list) }
     private var pinHash by stringPref("pinHash", "")
     val hasPin: Boolean get() = pinHash.isNotEmpty()
 

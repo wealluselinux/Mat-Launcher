@@ -7,10 +7,15 @@ A **Material You (Material 3) only** Android launcher, inspired by Void Launcher
 ## Features
 
 - **Material You everywhere**: dynamic color on Android 12+, wallpaper-derived colors on older versions
-- **Home**: clock (digital or analog), weather and photo widgets, pinned apps, dock, a second "Today" page
+- **Home**: a single editable home screen. Built-in clock, weather, photo and Ask Mat AI widgets sit next to widgets from your other apps. Long-press the home screen, then **Edit home** to move, resize (half / full width, any height) or remove each one
+- **Widgets**: add any Android widget from any app. The picker lists apps first; tap an app to expand its widgets with previews, so apps with hundreds of widgets don't bury the rest. The built-in widgets can be restyled (clock: stacked / digital / analog / minimal, weather: card / pill / minimal, photos: rounded / cookie / circle)
 - **App drawer**: swipe up, search, long-press for rename / change icon / hide / uninstall / app info
-- **Control center**: swipe down. Real flashlight and volume, brightness, auto-rotate, Do Not Disturb, plus shortcuts to Internet, Bluetooth, Airplane and Location
-- **Lock screen**: Material You clock lock screen with optional 4-digit PIN. Double-tap the home screen to lock. It is a launcher-level lock layer and does **not** replace the system lock
+- **Control center**: swipe down (or from the very top). Choose which tiles to show and their order, large or compact style, and toggle the clock header, brightness, volume and shortcuts. Real flashlight and volume; Wi-Fi, Bluetooth, Airplane and Location open the system panels (Android doesn't let apps flip them)
+- **Lock screen**: Material You lock screen with notifications and quick toggles. Choose gradient, solid or dimmed-wallpaper background, stacked / one-line / analog clock, alignment, how many notifications, and which toggles. Optional 4-digit PIN. Double-tap the home screen to lock. It is a launcher-level lock layer and does **not** replace the system lock
+- **Top bar**: customize the date / weather header (format, size, alignment) and optionally hide the status bar
+- **First-run welcome**: guided setup for icons, widgets, lock screen and permissions, with a transition to the home screen
+- **Google Sans** font and an app-open animation
+- **Updates**: Settings → Updates checks the latest GitHub release, downloads it and opens the system installer, updating Mat Weather too
 - **Mat AI**: built-in assistant. It is rule-based (no real LLM, by design): open apps, weather, battery, flashlight, math, jokes, web search, and "transparent icons" style commands
 - **Icon customization**: shapes (circle, squircle, rounded, teardrop), styles (original, **match wallpaper**, **transparent**, glass), size, labels, and per-app custom icon images or names
 - **Wallpaper**: pick from your gallery or from built-in Material gradients

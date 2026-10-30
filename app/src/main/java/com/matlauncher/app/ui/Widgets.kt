@@ -59,7 +59,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.matlauncher.app.data.ClockStyle
+import com.matlauncher.app.data.HAlign
 import com.matlauncher.app.data.LauncherSettings
+import com.matlauncher.app.data.TextScale
 import com.matlauncher.app.data.PhotoShape
 import com.matlauncher.app.data.WeatherStyle
 import com.matlauncher.app.util.ImageTools
@@ -108,18 +110,31 @@ val CookieShape = GenericShape { size, _ ->
 @Composable
 fun AtAGlance(weather: WeatherData?, settings: LauncherSettings, modifier: Modifier = Modifier) {
     val now by rememberNow()
-    val date = SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date(now))
-    Column(modifier) {
-        Text(
-            date,
-            color = Color.White,
-            style = MaterialTheme.typography.headlineMedium.merge(OnWallpaper),
-        )
-        if (weather != null) {
+    val date = SimpleDateFormat(settings.topBarDateStyle.pattern, Locale.getDefault()).format(Date(now))
+    val centered = settings.topBarAlign == HAlign.CENTER
+    val titleStyle = when (settings.topBarSize) {
+        TextScale.SMALL -> MaterialTheme.typography.titleLarge
+        TextScale.MEDIUM -> MaterialTheme.typography.headlineMedium
+        TextScale.LARGE -> MaterialTheme.typography.displaySmall
+    }
+    val subStyle = when (settings.topBarSize) {
+        TextScale.SMALL -> MaterialTheme.typography.bodyMedium
+        TextScale.MEDIUM -> MaterialTheme.typography.titleMedium
+        TextScale.LARGE -> MaterialTheme.typography.titleLarge
+    }
+    Column(
+        modifier.fillMaxWidth(),
+        horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
+    ) {
+        if (settings.topBarDate) {
+            Text(date, color = Color.White, style = titleStyle.merge(OnWallpaper), textAlign = if (centered) TextAlign.Center else TextAlign.Start)
+        }
+        if (settings.topBarWeather && weather != null) {
             Text(
                 tempString(weather.tempC, settings.useFahrenheit) + "  ·  " + conditionLabel(weather.code),
                 color = Color.White.copy(alpha = 0.92f),
-                style = MaterialTheme.typography.titleMedium.merge(OnWallpaper),
+                style = subStyle.merge(OnWallpaper),
+                textAlign = if (centered) TextAlign.Center else TextAlign.Start,
             )
         }
     }

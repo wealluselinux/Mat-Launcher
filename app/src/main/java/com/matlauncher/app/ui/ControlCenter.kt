@@ -54,11 +54,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.matlauncher.app.data.CcStyle
+import com.matlauncher.app.data.LauncherSettings
 import com.matlauncher.app.util.SystemControls
 import kotlinx.coroutines.delay
 
 @Composable
-fun ControlCenter(sys: SystemControls, actions: LauncherActions) {
+fun ControlCenter(sys: SystemControls, settings: LauncherSettings, actions: LauncherActions) {
     val scheme = MaterialTheme.colorScheme
     val now by rememberNow()
 
@@ -93,7 +95,7 @@ fun ControlCenter(sys: SystemControls, actions: LauncherActions) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 // header
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                if (settings.ccShowHeader) Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
                             java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(now)),
@@ -120,42 +122,44 @@ fun ControlCenter(sys: SystemControls, actions: LauncherActions) {
                     SmallAction(Icons.Rounded.Notifications, "Notifications") { sys.expandNotifications() }
                 }
 
-                // toggles
-                TileRow(
-                    Tile(Icons.Rounded.Wifi, "Internet", sys.netLabel, sys.netLabel != "Off") { sys.openInternetPanel() },
-                    Tile(Icons.Rounded.Bluetooth, "Bluetooth", if (sys.bluetoothOn) "On" else "Off", sys.bluetoothOn) { sys.openBluetooth() },
-                )
-                TileRow(
-                    Tile(Icons.Rounded.FlashlightOn, "Flashlight", if (sys.torchOn) "On" else "Off", sys.torchOn) {
-                        sys.setTorch(!sys.torchOn)
-                    },
-                    Tile(Icons.Rounded.AirplanemodeActive, "Airplane", if (sys.airplaneOn) "On" else "Off", sys.airplaneOn) { sys.openAirplane() },
-                )
-                TileRow(
-                    Tile(Icons.Rounded.ScreenRotation, "Auto-rotate", if (sys.rotationAuto) "On" else "Locked", sys.rotationAuto) {
-                        sys.toggleRotation()
-                    },
-                    Tile(Icons.Rounded.DoNotDisturbOn, "Do not disturb", if (sys.dndOn) "On" else "Off", sys.dndOn) { sys.toggleDnd() },
-                )
-                TileRow(
-                    Tile(Icons.Rounded.LocationOn, "Location", if (sys.locationOn) "On" else "Off", sys.locationOn) { sys.openLocation() },
-                    Tile(Icons.Rounded.AutoAwesome, "Mat AI", "Ask anything", false) { actions.openAi() },
-                )
+                // tiles
+                val specs = settings.ccTiles.map { tileSpec(it, sys, onAi = { actions.openAi() }, gate = { act -> act() }) }
+                if (settings.ccStyle == CcStyle.LARGE) {
+                    specs.chunked(2).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            row.forEach { TileView(it, Modifier.weight(1f)) }
+                            if (row.size < 2) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                } else {
+                    specs.chunked(4).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            row.forEach { CompactTile(it, Modifier.weight(1f)) }
+                            repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
 
                 // sliders
-                var bright by remember { mutableFloatStateOf(sys.brightness) }
-                LaunchedEffect(sys.brightness) { bright = sys.brightness }
-                SliderCard(Icons.Rounded.Brightness6, bright, onChange = { bright = it }, onFinish = { sys.setBrightness(bright) })
+                if (settings.ccShowBrightness) {
+                    var bright by remember { mutableFloatStateOf(sys.brightness) }
+                    LaunchedEffect(sys.brightness) { bright = sys.brightness }
+                    SliderCard(Icons.Rounded.Brightness6, bright, onChange = { bright = it }, onFinish = { sys.setBrightness(bright) })
+                }
 
-                var vol by remember { mutableFloatStateOf(sys.volume) }
-                LaunchedEffect(sys.volume) { vol = sys.volume }
-                SliderCard(Icons.AutoMirrored.Rounded.VolumeUp, vol, onChange = { vol = it; sys.changeVolume(it) }, onFinish = {})
+                if (settings.ccShowVolume) {
+                    var vol by remember { mutableFloatStateOf(sys.volume) }
+                    LaunchedEffect(sys.volume) { vol = sys.volume }
+                    SliderCard(Icons.AutoMirrored.Rounded.VolumeUp, vol, onChange = { vol = it; sys.changeVolume(it) }, onFinish = {})
+                }
 
                 // shortcuts
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Shortcut(Icons.Rounded.Wallpaper, "Wallpaper", Modifier.weight(1f)) { actions.showWallpaperGallery() }
-                    Shortcut(Icons.Rounded.Lock, "Lock", Modifier.weight(1f)) { actions.lockNow() }
-                    Shortcut(Icons.Rounded.Settings, "Mat settings", Modifier.weight(1f)) { actions.openSettings() }
+                if (settings.ccShowShortcuts) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Shortcut(Icons.Rounded.Wallpaper, "Wallpaper", Modifier.weight(1f)) { actions.showWallpaperGallery() }
+                        Shortcut(Icons.Rounded.Lock, "Lock", Modifier.weight(1f)) { actions.lockNow() }
+                        Shortcut(Icons.Rounded.Settings, "Mat settings", Modifier.weight(1f)) { actions.openSettings() }
+                    }
                 }
 
                 // drag handle: swipe up or tap to close
@@ -188,24 +192,8 @@ fun ControlCenter(sys: SystemControls, actions: LauncherActions) {
     }
 }
 
-private class Tile(
-    val icon: ImageVector,
-    val label: String,
-    val sub: String,
-    val active: Boolean,
-    val onClick: () -> Unit,
-)
-
 @Composable
-private fun androidx.compose.foundation.layout.ColumnScope.TileRow(a: Tile, b: Tile) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        TileView(a, Modifier.weight(1f))
-        TileView(b, Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun TileView(t: Tile, modifier: Modifier) {
+private fun TileView(t: TileSpec, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         onClick = t.onClick,
@@ -225,6 +213,20 @@ private fun TileView(t: Tile, modifier: Modifier) {
                 Text(t.sub, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+    }
+}
+
+@Composable
+private fun CompactTile(t: TileSpec, modifier: Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = t.onClick,
+        modifier = modifier.height(64.dp),
+        shape = RoundedCornerShape(50),
+        color = if (t.active) scheme.primary else scheme.surfaceContainerHighest,
+        contentColor = if (t.active) scheme.onPrimary else scheme.onSurface,
+    ) {
+        Box(contentAlignment = Alignment.Center) { Icon(t.icon, t.label, Modifier.size(26.dp)) }
     }
 }
 

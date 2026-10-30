@@ -17,7 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
-import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.Opacity
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Settings
@@ -85,9 +86,11 @@ fun HomeMenu(settings: LauncherSettings, actions: LauncherActions) {
                         actions.closeOverlay()
                         actions.showWallpaperGallery()
                     }
-                    ActionTile("Photos", Icons.Rounded.AddPhotoAlternate, Modifier.weight(1f)) {
-                        actions.closeOverlay()
-                        actions.pickPhotos()
+                    ActionTile("Widgets", Icons.Rounded.Widgets, Modifier.weight(1f)) {
+                        actions.openWidgetPicker()
+                    }
+                    ActionTile("Edit home", Icons.Rounded.Edit, Modifier.weight(1f)) {
+                        actions.editHome()
                     }
                     ActionTile("Settings", Icons.Rounded.Settings, Modifier.weight(1f)) {
                         actions.openSettings()
@@ -135,7 +138,7 @@ private fun ActionTile(label: String, icon: ImageVector, modifier: Modifier, onC
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(icon, null, Modifier.size(26.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge)
+            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
         }
     }
 }

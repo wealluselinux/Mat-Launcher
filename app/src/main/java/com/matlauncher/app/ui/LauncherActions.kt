@@ -8,6 +8,8 @@ class LauncherActions(
     val openDrawer: () -> Unit,
     val openControl: () -> Unit,
     val openHomeMenu: () -> Unit,
+    val openWidgetPicker: () -> Unit,
+    val editHome: () -> Unit,
     val openAi: () -> Unit,
     val openSettings: () -> Unit,
     val closeOverlay: () -> Unit,

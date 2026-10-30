@@ -1,53 +1,74 @@
 package com.matlauncher.app.ui
 
 import android.appwidget.AppWidgetHost
-import androidx.compose.foundation.ExperimentalFoundationApi
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProviderInfo
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.OpenInFull
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.matlauncher.app.data.AppInfo
+import com.matlauncher.app.data.ClockStyle
+import com.matlauncher.app.data.HomeItem
+import com.matlauncher.app.data.HomeKind
 import com.matlauncher.app.data.LauncherSettings
 import com.matlauncher.app.data.PhotoShape
 import com.matlauncher.app.data.WeatherStyle
 import com.matlauncher.app.weather.WeatherData
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     apps: List<AppInfo>,
@@ -56,11 +77,11 @@ fun HomeScreen(
     actions: LauncherActions,
     homeSignal: Int,
     widgetHost: AppWidgetHost,
+    editing: Boolean,
+    onEditingChange: (Boolean) -> Unit,
 ) {
-    val pagerState = rememberPagerState(pageCount = { 3 })
-    LaunchedEffect(homeSignal) {
-        if (pagerState.currentPage != 0) pagerState.animateScrollToPage(0)
-    }
+    val scroll = rememberScrollState()
+    LaunchedEffect(homeSignal) { scroll.animateScrollTo(0) }
 
     Box(
         Modifier
@@ -84,11 +105,42 @@ fun HomeScreen(
                 )
             }
     ) {
-        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            when (page) {
-                0 -> HomePage(apps, settings, weather, actions)
-                1 -> TodayPage(settings, actions)
-                else -> WidgetsPage(settings, widgetHost)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(scroll, enabled = scroll.maxValue > 0)
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 200.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (editing) {
+                EditHeader(onAdd = actions.openWidgetPicker, onDone = { onEditingChange(false) })
+            }
+            if (settings.topBarShow && (settings.topBarDate || settings.topBarWeather)) {
+                AtAGlance(weather, settings, Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+            }
+
+            HomeItems(settings, weather, actions, widgetHost, editing)
+
+            val pinnedApps = settings.pinned.mapNotNull { k -> apps.firstOrNull { it.key == k } }
+            val cols = settings.gridColumns
+            if (pinnedApps.isEmpty()) {
+                Text(
+                    "Long-press the home screen to add widgets or change styles, or long-press an app in the drawer to add it here",
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium.merge(OnWallpaper),
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            } else {
+                pinnedApps.chunked(cols).take(3).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { app ->
+                            AppCell(app, settings, actions, Modifier.weight(1f))
+                        }
+                        repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
             }
         }
 
@@ -99,137 +151,306 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(Modifier.padding(bottom = 8.dp)) {
-                repeat(3) { i ->
-                    val active = i == pagerState.currentPage
-                    Box(
-                        Modifier
-                            .padding(horizontal = 3.dp)
-                            .size(if (active) 18.dp else 6.dp, 6.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = if (active) 0.95f else 0.5f))
-                    )
-                }
-            }
             Dock(apps, settings, actions)
             Spacer(Modifier.height(10.dp))
             SearchPill(actions)
         }
+
+        // A strip along the top that always opens the control center, even when the page scrolls.
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .pointerInput(Unit) {
+                    var total = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { total = 0f },
+                        onDragEnd = { if (total > 60f) actions.openControl() },
+                        onDragCancel = { total = 0f },
+                        onVerticalDrag = { _, dy -> total += dy },
+                    )
+                }
+                .statusBarsPadding()
+                .height(22.dp)
+        )
     }
 }
 
+// ------------------------------------------------------------------------- layout
+
+private class Row2(val items: List<HomeItem>) {
+    val paired: Boolean get() = items.size == 2
+}
+
+private fun pairRows(items: List<HomeItem>): List<Row2> {
+    val out = mutableListOf<Row2>()
+    var i = 0
+    while (i < items.size) {
+        val a = items[i]
+        val b = items.getOrNull(i + 1)
+        if (a.half && b != null && b.half) {
+            out += Row2(listOf(a, b)); i += 2
+        } else {
+            out += Row2(listOf(a)); i += 1
+        }
+    }
+    return out
+}
+
+private fun autoHeight(item: HomeItem, paired: Boolean, settings: LauncherSettings, hostedDp: Int): Dp = when (item.kind) {
+    HomeKind.CLOCK -> if (paired) 172.dp else clockHeight(settings.clockStyle)
+    HomeKind.WEATHER -> if (paired) 172.dp else weatherHeight(settings.weatherStyle)
+    HomeKind.PHOTO -> 260.dp
+    HomeKind.AI -> 92.dp
+    HomeKind.HOSTED -> hostedDp.dp
+}
+
 @Composable
-private fun HomePage(
-    apps: List<AppInfo>,
+private fun HomeItems(
     settings: LauncherSettings,
     weather: WeatherData?,
     actions: LauncherActions,
+    host: AppWidgetHost,
+    editing: Boolean,
 ) {
-    val pinnedApps = settings.pinned.mapNotNull { k -> apps.firstOrNull { it.key == k } }
-    val cols = settings.gridColumns
-    Column(
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 215.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        AtAGlance(weather, settings, Modifier.padding(start = 8.dp, bottom = 4.dp))
+    val ctx = LocalContext.current
+    val awm = remember { AppWidgetManager.getInstance(ctx) }
+    val items = settings.homeItems
 
-        if (settings.weatherStyle == WeatherStyle.CARD) {
-            if (settings.showClock || settings.showWeather) {
-                Row(
-                    Modifier.fillMaxWidth().height(172.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    if (settings.showWeather) {
-                        WeatherWidget(weather, settings, onClick = actions.openWeatherApp, modifier = Modifier.weight(1.25f).fillMaxSize())
-                    }
-                    if (settings.showClock) {
-                        ClockWidget(settings, Modifier.weight(1f).fillMaxSize(), compact = true)
+    // forget widgets whose app was uninstalled
+    LaunchedEffect(items) {
+        val gone = items.filter { it.kind == HomeKind.HOSTED && awm.getAppWidgetInfo(it.id) == null }
+        if (gone.isNotEmpty()) {
+            gone.forEach { try { host.deleteAppWidgetId(it.id) } catch (e: Exception) { /* ignore */ } }
+            settings.setHomeItems(items - gone.toSet())
+        }
+    }
+
+    var resizing by remember { mutableStateOf<HomeItem?>(null) }
+    val live = items.filter { it.kind != HomeKind.HOSTED || awm.getAppWidgetInfo(it.id) != null }
+
+    fun replace(old: HomeItem, new: HomeItem) {
+        settings.setHomeItems(settings.homeItems.map { if (it.key == old.key) new else it })
+    }
+
+    fun move(item: HomeItem, delta: Int) {
+        val l = settings.homeItems.toMutableList()
+        val i = l.indexOfFirst { it.key == item.key }
+        val j = i + delta
+        if (i < 0 || j !in l.indices) return
+        val t = l[i]; l[i] = l[j]; l[j] = t
+        settings.setHomeItems(l)
+    }
+
+    fun remove(item: HomeItem) {
+        if (item.kind == HomeKind.HOSTED) {
+            try { host.deleteAppWidgetId(item.id) } catch (e: Exception) { /* ignore */ }
+        }
+        settings.setHomeItems(settings.homeItems.filter { it.key != item.key })
+    }
+
+    pairRows(live).forEach { row ->
+        val infos = row.items.map { if (it.kind == HomeKind.HOSTED) awm.getAppWidgetInfo(it.id) else null }
+        val heights = row.items.mapIndexed { i, it ->
+            if (it.height > 0) it.height.dp
+            else autoHeight(it, row.paired, settings, infos[i]?.let { inf -> hostedAutoHeightDp(ctx, inf) } ?: 160)
+        }
+        Row(
+            Modifier.fillMaxWidth().height(heights.maxOf { it }),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            row.items.forEachIndexed { i, item ->
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    ItemContent(item, infos[i], row.paired, settings, weather, actions, host)
+                    if (editing) {
+                        Box(
+                            Modifier
+                                .matchParentSizeCompat()
+                                .clip(RoundedCornerShape(28.dp))
+                                .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(28.dp))
+                                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                        )
+                        EditBar(
+                            Modifier.align(Alignment.BottomCenter).padding(8.dp),
+                            onUp = { move(item, -1) },
+                            onDown = { move(item, 1) },
+                            onResize = { resizing = item },
+                            onRemove = { remove(item) },
+                        )
                     }
                 }
-            }
-        } else {
-            if (settings.showWeather) {
-                WeatherWidget(
-                    weather, settings, onClick = actions.openWeatherApp,
-                    modifier = Modifier.fillMaxWidth().height(weatherHeight(settings.weatherStyle)),
-                )
-            }
-            if (settings.showClock) {
-                ClockWidget(settings, Modifier.fillMaxWidth().height(clockHeight(settings.clockStyle)))
             }
         }
+    }
 
-        if (pinnedApps.isEmpty()) {
-            Text(
-                "Long-press the home screen for style options, or long-press an app in the drawer to add it here",
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyMedium.merge(OnWallpaper),
-                color = Color.White.copy(alpha = 0.85f),
-            )
+    resizing?.let { item0 ->
+        val current = live.firstOrNull { it.key == item0.key }
+        if (current == null) {
+            resizing = null
         } else {
-            pinnedApps.chunked(cols).take(3).forEach { row ->
-                Row(Modifier.fillMaxWidth()) {
-                    row.forEach { app ->
-                        AppCell(app, settings, actions, Modifier.weight(1f))
-                    }
-                    repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
-                }
+            val info = if (current.kind == HomeKind.HOSTED) awm.getAppWidgetInfo(current.id) else null
+            val paired = pairRows(live).firstOrNull { r -> r.items.any { it.key == current.key } }?.paired == true
+            val autoDp = autoHeight(current, paired, settings, info?.let { hostedAutoHeightDp(ctx, it) } ?: 160).value.toInt()
+            ResizeDialog(
+                item = current,
+                autoDp = autoDp,
+                settings = settings,
+                onChange = { replace(current, it) },
+                onDismiss = { resizing = null },
+            )
+        }
+    }
+}
+
+private fun Modifier.matchParentSizeCompat(): Modifier = this.fillMaxSize()
+
+@Composable
+private fun ItemContent(
+    item: HomeItem,
+    info: AppWidgetProviderInfo?,
+    paired: Boolean,
+    settings: LauncherSettings,
+    weather: WeatherData?,
+    actions: LauncherActions,
+    host: AppWidgetHost,
+) {
+    when (item.kind) {
+        HomeKind.CLOCK -> ClockWidget(settings, Modifier.fillMaxSize(), compact = paired)
+        HomeKind.WEATHER -> WeatherWidget(weather, settings, onClick = actions.openWeatherApp, modifier = Modifier.fillMaxSize())
+        HomeKind.PHOTO -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            PhotoWidget(
+                settings,
+                onAdd = actions.pickPhotos,
+                modifier = if (settings.photoShape == PhotoShape.ROUNDED) Modifier.fillMaxSize()
+                else Modifier.fillMaxHeight().aspectRatio(1f),
+            )
+        }
+        HomeKind.AI -> AiCard(actions, Modifier.fillMaxSize())
+        HomeKind.HOSTED -> if (info != null) HostedWidgetView(host, item.id, info, Modifier.fillMaxSize())
+    }
+}
+
+// ------------------------------------------------------------------------- edit mode
+
+@Composable
+private fun EditHeader(onAdd: () -> Unit, onDone: () -> Unit) {
+    Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 18.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Edit home", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Move, resize or remove widgets",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+            FilledTonalButton(onClick = onAdd) {
+                Icon(Icons.Rounded.Add, null, Modifier.size(18.dp))
+                Text(" Widget")
+            }
+            Button(onClick = onDone) { Text("Done") }
         }
     }
 }
 
 @Composable
-private fun TodayPage(settings: LauncherSettings, actions: LauncherActions) {
+private fun EditBar(modifier: Modifier, onUp: () -> Unit, onDown: () -> Unit, onResize: () -> Unit, onRemove: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    Column(
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 215.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (settings.showPhoto) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PhotoWidget(
-                    settings,
-                    onAdd = actions.pickPhotos,
-                    modifier = if (settings.photoShape == PhotoShape.ROUNDED) Modifier.fillMaxSize()
-                    else Modifier.fillMaxWidth().aspectRatio(1f),
-                )
-            }
-        } else {
-            Spacer(Modifier.weight(1f))
+    Surface(modifier, shape = RoundedCornerShape(50), color = scheme.secondaryContainer, contentColor = scheme.onSecondaryContainer) {
+        Row(Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            BarButton(Icons.Rounded.KeyboardArrowUp, "Move up", onUp)
+            BarButton(Icons.Rounded.KeyboardArrowDown, "Move down", onDown)
+            BarButton(Icons.Rounded.OpenInFull, "Resize", onResize)
+            BarButton(Icons.Rounded.Close, "Remove", onRemove)
         }
-        Surface(
-            onClick = actions.openAi,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(36.dp),
-            color = scheme.tertiaryContainer,
-            contentColor = scheme.onTertiaryContainer,
+    }
+}
+
+@Composable
+private fun BarButton(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
+    Icon(
+        icon, desc,
+        Modifier.size(36.dp).clip(RoundedCornerShape(50)).clickable(onClick = onClick).padding(7.dp),
+    )
+}
+
+@Composable
+private fun ResizeDialog(
+    item: HomeItem,
+    autoDp: Int,
+    settings: LauncherSettings,
+    onChange: (HomeItem) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val effective = if (item.height > 0) item.height else autoDp
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (item.kind == HomeKind.HOSTED) "Resize widget" else "Resize ${item.kind.label}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Label("Width")
+                Chips(listOf(true, false), item.half, { if (it) "Half" else "Full" }) { onChange(item.copy(half = it)) }
+                Label("Height: ${if (item.height > 0) "$effective dp" else "Auto ($autoDp dp)"}")
+                Slider(
+                    value = effective.toFloat().coerceIn(60f, 560f),
+                    onValueChange = { onChange(item.copy(height = it.toInt())) },
+                    valueRange = 60f..560f,
+                )
+                TextButton(onClick = { onChange(item.copy(height = 0)) }) { Text("Reset height to auto") }
+                when (item.kind) {
+                    HomeKind.CLOCK -> {
+                        Label("Style")
+                        Chips(ClockStyle.values().toList(), settings.clockStyle, { it.label }) { settings.clockStyle = it }
+                    }
+                    HomeKind.WEATHER -> {
+                        Label("Style")
+                        Chips(WeatherStyle.values().toList(), settings.weatherStyle, { it.label }) { settings.weatherStyle = it }
+                    }
+                    HomeKind.PHOTO -> {
+                        Label("Shape")
+                        Chips(PhotoShape.values().toList(), settings.photoShape, { it.label }) { settings.photoShape = it }
+                    }
+                    else -> {}
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
+}
+
+// ------------------------------------------------------------------------- bits
+
+@Composable
+private fun AiCard(actions: LauncherActions, modifier: Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = actions.openAi,
+        modifier = modifier,
+        shape = RoundedCornerShape(36.dp),
+        color = scheme.tertiaryContainer,
+        contentColor = scheme.onTertiaryContainer,
+    ) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(
-                Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            Box(
+                Modifier.size(48.dp).clip(CookieShape).background(scheme.tertiary),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    Modifier.size(48.dp).clip(CookieShape).background(scheme.tertiary),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(26.dp), tint = scheme.onTertiary)
-                }
-                Column {
-                    Text("Ask Mat AI", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Open apps, check the weather, do math, restyle your icons",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(26.dp), tint = scheme.onTertiary)
+            }
+            Column {
+                Text("Ask Mat AI", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Open apps, check the weather, do math, restyle your icons",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }
@@ -281,7 +502,7 @@ private fun SearchPill(actions: LauncherActions) {
             Icon(
                 Icons.Rounded.AutoAwesome,
                 "Ask Mat AI",
-                Modifier.size(24.dp).clip(CircleShape).clickable { actions.openAi() },
+                Modifier.size(24.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable { actions.openAi() },
                 tint = scheme.primary,
             )
         }

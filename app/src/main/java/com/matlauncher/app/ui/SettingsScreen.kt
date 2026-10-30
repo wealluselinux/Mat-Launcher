@@ -64,6 +64,7 @@ fun SettingsScreen(
     settings: LauncherSettings,
     actions: LauncherActions,
     weatherInstalled: Boolean,
+    updater: com.matlauncher.app.util.Updater,
     onBack: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -143,11 +144,16 @@ fun SettingsScreen(
                     SwitchRow("Photo widget", settings.showPhoto) { settings.showPhoto = it }
                     Label("Photo shape")
                     Chips(com.matlauncher.app.data.PhotoShape.values().toList(), settings.photoShape, { it.label }) { settings.photoShape = it }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Button(onClick = actions.openWidgetPicker) { Text("Add widget") }
+                        FilledTonalButton(onClick = actions.editHome) { Text("Edit layout") }
+                    }
                     Text(
-                        "Add widgets from other apps on the Widgets page (swipe left twice on the home screen).",
+                        "Widgets live on the home screen. Use Edit layout to move, resize or remove them. Pick any widget from any app, grouped by app.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,
                     )
+                    FilledTonalButton(onClick = { settings.resetLayout() }) { Text("Reset layout") }
                     SwitchRow("Fahrenheit", settings.useFahrenheit) { settings.useFahrenheit = it }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -164,6 +170,9 @@ fun SettingsScreen(
                         FilledTonalButton(onClick = { hiddenDialog = true }) { Text("Manage") }
                     }
                 }
+
+                Header("Top bar")
+                TopBarSettings(settings)
 
                 // ---------------- Lock
                 Header("Lock screen")
@@ -187,6 +196,15 @@ fun SettingsScreen(
                         color = scheme.onSurfaceVariant,
                     )
                 }
+
+                Header("Lock screen look")
+                LockLookSettings(settings)
+
+                Header("Control center")
+                ControlCenterSettings(settings)
+
+                Header("Updates")
+                UpdateCard(updater, settings, weatherInstalled)
 
                 // ---------------- Apps
                 Header("Apps")
@@ -221,7 +239,7 @@ fun SettingsScreen(
 
                 Header("About")
                 Card {
-                    Text("Mat Launcher 1.2.0", style = MaterialTheme.typography.titleMedium)
+                    Text("Mat Launcher ${updater.installedLauncherVersion(LocalContext.current)}", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "Open source, Material You only. github.com/wealluselinux/Mat-Launcher",
                         style = MaterialTheme.typography.bodySmall,

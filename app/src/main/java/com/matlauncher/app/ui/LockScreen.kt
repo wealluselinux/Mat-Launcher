@@ -60,7 +60,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import com.matlauncher.app.data.HAlign
 import com.matlauncher.app.data.LauncherSettings
+import com.matlauncher.app.data.LockBackground
+import com.matlauncher.app.data.LockClockStyle
 import com.matlauncher.app.util.NotifItem
 import com.matlauncher.app.util.NotificationStore
 import com.matlauncher.app.util.SystemControls
@@ -126,6 +129,15 @@ fun LockScreen(
         }
     }
 
+    val wall = settings.lockBackground == LockBackground.WALLPAPER
+    val strong = when (settings.lockBackground) {
+        LockBackground.GRADIENT -> scheme.onPrimaryContainer
+        LockBackground.SOLID -> scheme.onSurface
+        LockBackground.WALLPAPER -> Color.White
+    }
+    val accent = if (wall) Color.White.copy(alpha = 0.8f) else scheme.primary
+    val subtle = if (wall) Color.White.copy(alpha = 0.8f) else scheme.onSurfaceVariant
+    val centered = settings.lockAlign == HAlign.CENTER
     val is24 = DateFormat.is24HourFormat(ctx)
     val hh = SimpleDateFormat(if (is24) "HH" else "hh", Locale.getDefault()).format(Date(now))
     val mm = SimpleDateFormat("mm", Locale.getDefault()).format(Date(now))
@@ -134,7 +146,13 @@ fun LockScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(scheme.primaryContainer, scheme.surface)))
+            .then(
+                when (settings.lockBackground) {
+                    LockBackground.GRADIENT -> Modifier.background(Brush.verticalGradient(listOf(scheme.primaryContainer, scheme.surface)))
+                    LockBackground.SOLID -> Modifier.background(scheme.surface)
+                    LockBackground.WALLPAPER -> Modifier.background(Color.Black.copy(alpha = 0.5f))
+                }
+            )
             .pointerInput(Unit) {
                 var total = 0f
                 detectVerticalDragGestures(
@@ -149,6 +167,7 @@ fun LockScreen(
             }
     ) {
         // decorative cookie shapes, solid tonal colors
+        if (!wall) {
         Box(
             Modifier
                 .align(Alignment.TopEnd)
@@ -165,32 +184,40 @@ fun LockScreen(
                 .clip(CookieShape)
                 .background(scheme.tertiaryContainer.copy(alpha = 0.5f))
         )
+        }
 
         Column(
             Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 22.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.Start,
+            horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Lock, null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(date, color = scheme.onPrimaryContainer, style = MaterialTheme.typography.titleMedium)
+                Icon(Icons.Rounded.Lock, null, tint = strong, modifier = Modifier.size(18.dp))
+                if (settings.lockShowDate) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(date, color = strong, style = MaterialTheme.typography.titleMedium)
+                }
             }
             Spacer(Modifier.height(if (showPad) 4.dp else 12.dp))
-            val size = if (showPad) 84.sp else 132.sp
-            Text(
-                hh,
-                color = scheme.onPrimaryContainer,
-                fontSize = size,
-                lineHeight = size * 0.86f,
-                fontWeight = FontWeight.Black,
-            )
-            Text(
-                mm,
-                color = scheme.primary,
-                fontSize = size,
-                lineHeight = size * 0.86f,
-                fontWeight = FontWeight.Black,
-            )
+            when (settings.lockClockStyle) {
+                LockClockStyle.STACKED -> {
+                    val size = if (showPad) 84.sp else 132.sp
+                    Text(hh, color = strong, fontSize = size, lineHeight = size * 0.86f, fontWeight = FontWeight.Black)
+                    Text(mm, color = accent, fontSize = size, lineHeight = size * 0.86f, fontWeight = FontWeight.Black)
+                }
+                LockClockStyle.INLINE -> {
+                    val size = if (showPad) 64.sp else 92.sp
+                    Text("$hh:$mm", color = strong, fontSize = size, fontWeight = FontWeight.Bold)
+                }
+                LockClockStyle.ANALOG -> {
+                    val box = if (showPad) 150.dp else 240.dp
+                    Box(
+                        Modifier.size(box).clip(CookieShape).background(scheme.secondaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AnalogClock(now, Modifier.fillMaxSize().padding(20.dp))
+                    }
+                }
+            }
 
             if (showPad) {
                 Column(Modifier.fillMaxWidth().weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -214,7 +241,7 @@ fun LockScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         if (error) "Wrong PIN" else "Enter PIN",
-                        color = scheme.onSurfaceVariant,
+                        color = subtle,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Spacer(Modifier.height(12.dp))
@@ -234,7 +261,8 @@ fun LockScreen(
             } else {
                 Spacer(Modifier.height(12.dp))
                 // ---- notifications
-                Column(
+                if (!settings.lockShowNotifs) Spacer(Modifier.weight(1f))
+                else Column(
                     Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -266,41 +294,42 @@ fun LockScreen(
                     } else {
                         val items = NotificationStore.items
                         if (items.isEmpty()) {
-                            Text("No new notifications", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                            Text("No new notifications", color = subtle, style = MaterialTheme.typography.bodyMedium)
                         }
-                        items.take(5).forEach { n ->
+                        val maxN = settings.lockMaxNotifs.coerceAtLeast(1)
+                        items.take(maxN).forEach { n ->
                             NotificationCard(n) {
                                 unlockThen {
                                     try { n.intent?.send() } catch (e: Exception) { /* canceled */ }
                                 }
                             }
                         }
-                        if (items.size > 5) {
-                            Text("+${items.size - 5} more", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.labelLarge)
+                        if (items.size > maxN) {
+                            Text("+${items.size - maxN} more", color = subtle, style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }
 
                 // ---- quick toggles
-                Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (settings.lockShowToggles) {
+                    Spacer(Modifier.height(10.dp))
                     fun gated(action: () -> Unit) {
                         if (settings.hasPin) Toast.makeText(ctx, "Unlock to change this", Toast.LENGTH_SHORT).show()
                         else action()
                     }
-                    QuickTile(Icons.Rounded.Wifi, sys.netLabel != "Off", Modifier.weight(1f)) { gated { sys.openInternetPanel() } }
-                    QuickTile(Icons.Rounded.Bluetooth, sys.bluetoothOn, Modifier.weight(1f)) { gated { sys.openBluetooth() } }
-                    QuickTile(Icons.Rounded.FlashlightOn, sys.torchOn, Modifier.weight(1f)) { sys.setTorch(!sys.torchOn) }
-                    QuickTile(Icons.Rounded.AirplanemodeActive, sys.airplaneOn, Modifier.weight(1f)) { gated { sys.openAirplane() } }
+                    val specs = settings.lockTiles.filter { it.onLock }.map { tileSpec(it, sys, onAi = {}, gate = { act -> gated(act) }) }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        specs.forEach { QuickTile(it.icon, it.active, Modifier.weight(1f), it.onClick) }
+                    }
                 }
 
                 // ---- unlock hint
                 Column(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        Icons.Rounded.KeyboardArrowUp, null, tint = scheme.onSurface,
+                        Icons.Rounded.KeyboardArrowUp, null, tint = strong,
                         modifier = Modifier.size(30.dp).clickable { unlockThen(null) },
                     )
-                    Text("Swipe up to unlock", color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                    Text("Swipe up to unlock", color = subtle, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
