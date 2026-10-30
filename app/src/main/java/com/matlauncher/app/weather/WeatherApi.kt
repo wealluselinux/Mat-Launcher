@@ -17,6 +17,7 @@ data class WeatherData(
     val humidity: Int,
     val windKmh: Double,
     val isDay: Boolean,
+    val precipPct: Int,
     val days: List<DayForecast>,
 )
 
@@ -67,7 +68,7 @@ object WeatherApi {
         try {
             val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
                 "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day" +
-                "&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7"
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=7"
             val o = JSONObject(get(url))
             val cur = o.getJSONObject("current")
             val d = o.getJSONObject("daily")
@@ -75,6 +76,7 @@ object WeatherApi {
             val codes = d.getJSONArray("weather_code")
             val his = d.getJSONArray("temperature_2m_max")
             val los = d.getJSONArray("temperature_2m_min")
+            val precip = d.optJSONArray("precipitation_probability_max")
             val days = (0 until dates.length()).map {
                 DayForecast(dates.getString(it), codes.getInt(it), his.getDouble(it), los.getDouble(it))
             }
@@ -85,6 +87,7 @@ object WeatherApi {
                 humidity = cur.getInt("relative_humidity_2m"),
                 windKmh = cur.getDouble("wind_speed_10m"),
                 isDay = cur.getInt("is_day") == 1,
+                precipPct = if (precip != null && precip.length() > 0 && !precip.isNull(0)) precip.getInt(0) else 0,
                 days = days,
             )
         } catch (e: Exception) {

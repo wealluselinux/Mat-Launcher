@@ -7,6 +7,7 @@ class LauncherActions(
     val launch: (AppInfo) -> Unit,
     val openDrawer: () -> Unit,
     val openControl: () -> Unit,
+    val openHomeMenu: () -> Unit,
     val openAi: () -> Unit,
     val openSettings: () -> Unit,
     val closeOverlay: () -> Unit,

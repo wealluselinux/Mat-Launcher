@@ -2,6 +2,7 @@ package com.matlauncher.app.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,7 +61,10 @@ fun HomeScreen(
         Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = { actions.lockNow() })
+                detectTapGestures(
+                    onDoubleTap = { actions.lockNow() },
+                    onLongPress = { actions.openHomeMenu() },
+                )
             }
             .pointerInput(Unit) {
                 var total = 0f
@@ -82,10 +87,10 @@ fun HomeScreen(
             Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(Modifier.padding(bottom = 10.dp)) {
+            Row(Modifier.padding(bottom = 8.dp)) {
                 repeat(2) { i ->
                     val active = i == pagerState.currentPage
                     Box(
@@ -98,6 +103,8 @@ fun HomeScreen(
                 }
             }
             Dock(apps, settings, actions)
+            Spacer(Modifier.height(10.dp))
+            SearchPill(actions)
         }
     }
 }
@@ -115,22 +122,34 @@ private fun HomePage(
         Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 150.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 215.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (settings.showClock) ClockWidget(settings)
-        if (settings.showWeather) WeatherWidget(weather, settings, onClick = actions.openWeatherApp)
+        AtAGlance(weather, settings, Modifier.padding(start = 8.dp, bottom = 4.dp))
+
+        if (settings.showClock || settings.showWeather) {
+            Row(
+                Modifier.fillMaxWidth().height(172.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (settings.showWeather) {
+                    WeatherWidget(weather, settings, onClick = actions.openWeatherApp, modifier = Modifier.weight(1.25f).fillMaxSize())
+                }
+                if (settings.showClock) {
+                    ClockWidget(settings, Modifier.weight(1f).fillMaxSize())
+                }
+            }
+        }
 
         if (pinnedApps.isEmpty()) {
             Text(
-                "Long-press an app in the drawer and choose \"Add to home\"",
-                modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                "Long-press the home screen for style options, or long-press an app in the drawer to add it here",
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyMedium.merge(OnWallpaper),
                 color = Color.White.copy(alpha = 0.85f),
             )
         } else {
-            Spacer(Modifier.height(4.dp))
             pinnedApps.chunked(cols).take(3).forEach { row ->
                 Row(Modifier.fillMaxWidth()) {
                     row.forEach { app ->
@@ -150,7 +169,7 @@ private fun TodayPage(settings: LauncherSettings, actions: LauncherActions) {
         Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 150.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 215.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (settings.showPhoto) {
@@ -161,16 +180,21 @@ private fun TodayPage(settings: LauncherSettings, actions: LauncherActions) {
         Surface(
             onClick = actions.openAi,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(30.dp),
-            color = scheme.tertiaryContainer.copy(alpha = 0.92f),
+            shape = RoundedCornerShape(36.dp),
+            color = scheme.tertiaryContainer,
             contentColor = scheme.onTertiaryContainer,
         ) {
             Row(
-                Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(28.dp))
+                Box(
+                    Modifier.size(48.dp).clip(CookieShape).background(scheme.tertiary),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Rounded.AutoAwesome, null, Modifier.size(26.dp), tint = scheme.onTertiary)
+                }
                 Column {
                     Text("Ask Mat AI", style = MaterialTheme.typography.titleMedium)
                     Text(
@@ -188,20 +212,50 @@ private fun Dock(apps: List<AppInfo>, settings: LauncherSettings, actions: Launc
     val scheme = MaterialTheme.colorScheme
     val dockApps = settings.dock.mapNotNull { k -> apps.firstOrNull { it.key == k } }
     Surface(
-        shape = RoundedCornerShape(34.dp),
-        color = scheme.surfaceContainer.copy(alpha = 0.88f),
+        shape = RoundedCornerShape(36.dp),
+        color = scheme.surfaceContainerHigh,
     ) {
         Row(
             Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             dockApps.forEach { app ->
-                AppCell(app, settings, actions, Modifier.size(68.dp), showLabel = false, iconSize = 52.dp)
+                AppCell(app, settings, actions, Modifier.size(70.dp), showLabel = false, iconSize = 54.dp)
             }
-            FilledTonalIconButton(onClick = actions.openDrawer, modifier = Modifier.size(52.dp)) {
-                Icon(Icons.Rounded.Apps, "App drawer")
+            if (dockApps.isEmpty()) {
+                FilledTonalIconButton(onClick = actions.openDrawer, modifier = Modifier.size(54.dp)) {
+                    Icon(Icons.Rounded.Apps, "App drawer")
+                }
             }
+        }
+    }
+}
+
+/** Pill search bar like the Pixel launcher's: tap to search apps, sparkle to ask Mat AI. */
+@Composable
+private fun SearchPill(actions: LauncherActions) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = actions.openDrawer,
+        modifier = Modifier.fillMaxWidth().height(58.dp),
+        shape = RoundedCornerShape(50),
+        color = scheme.surfaceContainerHigh,
+        contentColor = scheme.onSurfaceVariant,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(Icons.Rounded.Search, null, Modifier.size(24.dp), tint = scheme.primary)
+            Text("Search apps", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Icon(
+                Icons.Rounded.AutoAwesome,
+                "Ask Mat AI",
+                Modifier.size(24.dp).clip(CircleShape).clickable { actions.openAi() },
+                tint = scheme.primary,
+            )
         }
     }
 }

@@ -46,7 +46,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Overlay { None, Drawer, Control, Ai, Settings }
+enum class Overlay { None, Drawer, Control, Ai, Settings, HomeMenu }
 
 @Composable
 fun MatApp(activity: MainActivity) {
@@ -152,6 +152,7 @@ fun MatApp(activity: MainActivity) {
             },
             openDrawer = { overlay = Overlay.Drawer },
             openControl = { overlay = Overlay.Control },
+            openHomeMenu = { overlay = Overlay.HomeMenu },
             openAi = { aiQuery = null; overlay = Overlay.Ai },
             openSettings = { overlay = Overlay.Settings },
             closeOverlay = { overlay = Overlay.None },
@@ -248,6 +249,14 @@ fun MatApp(activity: MainActivity) {
                 exit = slideOutVertically(tween(220)) { it } + fadeOut(),
             ) {
                 SettingsScreen(repo.apps, settings, actions, weatherInstalled, onBack = { overlay = Overlay.None })
+            }
+
+            AnimatedVisibility(
+                visible = overlay == Overlay.HomeMenu,
+                enter = slideInVertically(tween(240)) { it / 2 } + fadeIn(),
+                exit = slideOutVertically(tween(200)) { it / 2 } + fadeOut(),
+            ) {
+                HomeMenu(settings, actions)
             }
 
             AnimatedVisibility(
