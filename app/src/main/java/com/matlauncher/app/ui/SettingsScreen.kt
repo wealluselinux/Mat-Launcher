@@ -203,7 +203,7 @@ fun SettingsScreen(
 
                 Header("About")
                 Card {
-                    Text("Mat Launcher 1.0.0", style = MaterialTheme.typography.titleMedium)
+                    Text("Mat Launcher 1.1.0", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "Open source, Material You only. github.com/wealluselinux/Mat-Launcher",
                         style = MaterialTheme.typography.bodySmall,
