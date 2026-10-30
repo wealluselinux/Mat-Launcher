@@ -20,9 +20,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Show environment
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME" || true
+          java -version
 
       - name: Build Mat Weather, bundle it, build Mat Launcher
         run: |
@@ -39,7 +41,7 @@ jobs:
         if: always()
         run: |
           mkdir -p "$RUNNER_TEMP/out"
-          cp "$RUNNER_TEMP/build.log" "$RUNNER_TEMP/out/build.log" || true
+          cp "$RUNNER_TEMP/build.log" "$RUNNER_TEMP/out/build.log" || echo "no build.log (an earlier step failed)" > "$RUNNER_TEMP/out/build.log"
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/out/MatLauncher.apk" || true
           cp weather/build/outputs/apk/release/weather-release.apk "$RUNNER_TEMP/out/MatWeather.apk" || true
           ls -la "$RUNNER_TEMP/out"
