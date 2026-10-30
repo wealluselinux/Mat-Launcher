@@ -1,0 +1,11 @@
+*.iml
+.gradle/
+build/
+local.properties
+.idea/
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+# the weather APK is built first and copied in by scripts/build.sh / CI
+app/src/main/assets/mat-weather.apk

@@ -1,0 +1,73 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Mat Weather, bundle it, build Mat Launcher
+        run: |
+          set -o pipefail
+          {
+            chmod +x gradlew
+            ./gradlew --no-daemon --stacktrace :weather:assembleRelease
+            mkdir -p app/src/main/assets
+            cp weather/build/outputs/apk/release/weather-release.apk app/src/main/assets/mat-weather.apk
+            ./gradlew --no-daemon --stacktrace :app:assembleRelease
+          } 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Collect outputs
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          cp "$RUNNER_TEMP/build.log" "$RUNNER_TEMP/out/build.log" || true
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/out/MatLauncher.apk" || true
+          cp weather/build/outputs/apk/release/weather-release.apk "$RUNNER_TEMP/out/MatWeather.apk" || true
+          ls -la "$RUNNER_TEMP/out"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mat-launcher-apks
+          path: ${{ runner.temp }}/out/
+
+      - name: Publish build output to the apk-build branch
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan apk-build
+          git rm -rf . > /dev/null 2>&1 || true
+          cp "$RUNNER_TEMP"/out/* .
+          printf '%s\n' "Built from ${GITHUB_SHA}" > BUILT_FROM.txt
+          git add -A
+          git commit -m "Build output for ${GITHUB_SHA}"
+          git push -f origin apk-build
+
+      - name: Create GitHub release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ runner.temp }}/out/MatLauncher.apk
+            ${{ runner.temp }}/out/MatWeather.apk
+          generate_release_notes: true
