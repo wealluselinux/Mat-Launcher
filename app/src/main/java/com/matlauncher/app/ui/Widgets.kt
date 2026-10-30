@@ -1,0 +1,318 @@
+package com.matlauncher.app.ui
+
+import android.text.format.DateFormat
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AcUnit
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.FlashOn
+import androidx.compose.material.icons.rounded.NightsStay
+import androidx.compose.material.icons.rounded.WaterDrop
+import androidx.compose.material.icons.rounded.WbCloudy
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.matlauncher.app.data.LauncherSettings
+import com.matlauncher.app.util.ImageTools
+import com.matlauncher.app.weather.WeatherData
+import com.matlauncher.app.weather.conditionLabel
+import com.matlauncher.app.weather.tempString
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.sin
+
+@Composable
+fun rememberNow(): State<Long> = produceState(System.currentTimeMillis()) {
+    while (true) {
+        value = System.currentTimeMillis()
+        delay(1000L - (value % 1000L))
+    }
+}
+
+// ------------------------------------------------------------------ clock
+
+@Composable
+fun ClockWidget(settings: LauncherSettings, modifier: Modifier = Modifier) {
+    val now by rememberNow()
+    val ctx = LocalContext.current
+    val scheme = MaterialTheme.colorScheme
+    val date = SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(Date(now))
+    val is24 = DateFormat.is24HourFormat(ctx)
+    val timeText = SimpleDateFormat(if (is24) "HH:mm" else "h:mm", Locale.getDefault()).format(Date(now))
+    val ampm = if (is24) "" else SimpleDateFormat("a", Locale.getDefault()).format(Date(now))
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(36.dp),
+        color = scheme.primaryContainer.copy(alpha = 0.92f),
+        contentColor = scheme.onPrimaryContainer,
+    ) {
+        if (settings.clockAnalog) {
+            Row(
+                Modifier.padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                AnalogClock(now, Modifier.size(120.dp))
+                Column {
+                    Text(date, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "$timeText $ampm".trim(),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Light,
+                    )
+                }
+            }
+        } else {
+            Column(Modifier.padding(horizontal = 24.dp, vertical = 18.dp)) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        timeText,
+                        fontSize = 72.sp,
+                        lineHeight = 76.sp,
+                        fontWeight = FontWeight.Light,
+                    )
+                    if (ampm.isNotEmpty()) {
+                        Text(
+                            ampm,
+                            modifier = Modifier.padding(start = 8.dp, bottom = 14.dp),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                    }
+                }
+                Text(date, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
+
+@Composable
+fun AnalogClock(nowMillis: Long, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val face = scheme.surface.copy(alpha = 0.55f)
+    val tick = scheme.onPrimaryContainer
+    val hand = scheme.primary
+    val second = scheme.tertiary
+    Canvas(modifier) {
+        val cal = Calendar.getInstance().apply { timeInMillis = nowMillis }
+        val h = (cal.get(Calendar.HOUR) % 12) + cal.get(Calendar.MINUTE) / 60f
+        val m = cal.get(Calendar.MINUTE) + cal.get(Calendar.SECOND) / 60f
+        val s = cal.get(Calendar.SECOND).toFloat()
+        val r = size.minDimension / 2f
+        val c = center
+        drawCircle(color = face, radius = r)
+        for (i in 0 until 12) {
+            val a = Math.toRadians(i * 30.0 - 90.0)
+            val dir = Offset(cos(a).toFloat(), sin(a).toFloat())
+            drawLine(
+                color = tick,
+                start = c + dir * (r * 0.84f),
+                end = c + dir * (r * 0.94f),
+                strokeWidth = if (i % 3 == 0) 5f else 2.5f,
+                cap = StrokeCap.Round,
+            )
+        }
+        fun drawHand(angleDeg: Float, length: Float, width: Float, color: Color) {
+            val a = Math.toRadians(angleDeg - 90.0)
+            drawLine(
+                color = color,
+                start = c,
+                end = c + Offset(cos(a).toFloat(), sin(a).toFloat()) * (r * length),
+                strokeWidth = width,
+                cap = StrokeCap.Round,
+            )
+        }
+        drawHand(h * 30f, 0.5f, 9f, hand)
+        drawHand(m * 6f, 0.75f, 6f, hand)
+        drawHand(s * 6f, 0.82f, 3f, second)
+        drawCircle(color = hand, radius = 7f, center = c)
+    }
+}
+
+// ---------------------------------------------------------------- weather
+
+fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
+    0, 1 -> if (isDay) Icons.Rounded.WbSunny else Icons.Rounded.NightsStay
+    2, 3 -> Icons.Rounded.WbCloudy
+    45, 48 -> Icons.Rounded.Cloud
+    51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> Icons.Rounded.WaterDrop
+    71, 73, 75, 77, 85, 86 -> Icons.Rounded.AcUnit
+    95, 96, 99 -> Icons.Rounded.FlashOn
+    else -> Icons.Rounded.WbCloudy
+}
+
+@Composable
+fun WeatherWidget(
+    weather: WeatherData?,
+    settings: LauncherSettings,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(30.dp),
+        color = scheme.tertiaryContainer.copy(alpha = 0.92f),
+        contentColor = scheme.onTertiaryContainer,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (weather == null) {
+                Text("Loading weather for ${settings.cityName}…", style = MaterialTheme.typography.titleMedium)
+            } else {
+                val f = settings.useFahrenheit
+                Box(
+                    Modifier.size(52.dp).clip(CircleShape).background(scheme.tertiary.copy(alpha = 0.18f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(weatherIcon(weather.code, weather.isDay), null, Modifier.size(30.dp))
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        tempString(weather.tempC, f),
+                        fontSize = 34.sp,
+                        lineHeight = 36.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(conditionLabel(weather.code), style = MaterialTheme.typography.bodyMedium)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        settings.cityName,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    weather.days.firstOrNull()?.let {
+                        Text(
+                            "H ${tempString(it.hiC, f)}  L ${tempString(it.loC, f)}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ------------------------------------------------------------------ photo
+
+@Composable
+fun PhotoWidget(settings: LauncherSettings, onAdd: () -> Unit, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val photos = settings.photos
+    var index by remember { mutableIntStateOf(0) }
+
+    androidx.compose.runtime.LaunchedEffect(photos.size) {
+        while (photos.size > 1) {
+            delay(8000)
+            index = (index + 1) % photos.size
+        }
+    }
+    val file = if (photos.isEmpty()) null else photos[index % photos.size]
+    val bmp: ImageBitmap? by produceState<ImageBitmap?>(null, file) {
+        value = file?.let { f ->
+            withContext(Dispatchers.IO) { ImageTools.decodeFile(f, 1280)?.asImageBitmap() }
+        }
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(36.dp),
+        color = scheme.secondaryContainer.copy(alpha = 0.92f),
+    ) {
+        Box(
+            Modifier.fillMaxSize().clickable(enabled = photos.size > 1) { index = (index + 1) % photos.size }
+        ) {
+            val b = bmp
+            if (b != null) {
+                Image(b, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)))
+                    )
+                )
+            } else {
+                Column(
+                    Modifier.fillMaxSize().clickable { onAdd() },
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(Icons.Rounded.AddPhotoAlternate, null, Modifier.size(48.dp), tint = scheme.onSecondaryContainer)
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        "Add photos to your widget",
+                        color = scheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+            if (file != null) {
+                Row(Modifier.align(Alignment.BottomEnd).padding(10.dp)) {
+                    IconButton(
+                        onClick = { settings.removePhoto(file); index = 0 },
+                        modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)),
+                    ) { Icon(Icons.Rounded.Delete, "Remove photo", tint = Color.White) }
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(
+                        onClick = onAdd,
+                        modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)),
+                    ) { Icon(Icons.Rounded.AddPhotoAlternate, "Add photos", tint = Color.White) }
+                }
+            }
+        }
+    }
+}

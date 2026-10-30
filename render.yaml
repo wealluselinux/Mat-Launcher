@@ -1,0 +1,6 @@
+services:
+  - type: web
+    runtime: static
+    name: mat-launcher
+    buildCommand: echo "static site, no build"
+    staticPublishPath: ./site
