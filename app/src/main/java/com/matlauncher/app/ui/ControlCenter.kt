@@ -149,7 +149,7 @@ fun ControlCenter(sys: SystemControls, actions: LauncherActions) {
 
                 var vol by remember { mutableFloatStateOf(sys.volume) }
                 LaunchedEffect(sys.volume) { vol = sys.volume }
-                SliderCard(Icons.AutoMirrored.Rounded.VolumeUp, vol, onChange = { vol = it; sys.setVolume(it) }, onFinish = {})
+                SliderCard(Icons.AutoMirrored.Rounded.VolumeUp, vol, onChange = { vol = it; sys.changeVolume(it) }, onFinish = {})
 
                 // shortcuts
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

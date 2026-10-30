@@ -141,7 +141,7 @@ class SystemControls(private val ctx: Context) {
         }
     }
 
-    fun setVolume(v: Float) {
+    fun changeVolume(v: Float) {
         val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         audio.setStreamVolume(AudioManager.STREAM_MUSIC, (v * max).roundToInt(), 0)
         volume = v
