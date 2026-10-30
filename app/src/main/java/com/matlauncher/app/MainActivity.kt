@@ -1,6 +1,7 @@
 package com.matlauncher.app
 
 import android.app.ActivityOptions
+import android.appwidget.AppWidgetHost
 import android.app.WallpaperManager
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -19,6 +20,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Rect
 import androidx.core.content.ContextCompat
 import com.matlauncher.app.data.AppInfo
 import com.matlauncher.app.data.AppRepository
@@ -33,6 +35,8 @@ class MainActivity : ComponentActivity() {
     val homeSignal = mutableIntStateOf(0)
     val reloadTick = mutableIntStateOf(0)
     val wallpaperSeed = mutableStateOf<Int?>(null)
+
+    val widgetHost: AppWidgetHost by lazy { AppWidgetHost(this, 2026) }
 
     private var wm: WallpaperManager? = null
     private var colorsListener: Any? = null
@@ -81,6 +85,16 @@ class MainActivity : ComponentActivity() {
         setContent { MatApp(this) }
     }
 
+    override fun onStart() {
+        super.onStart()
+        try { widgetHost.startListening() } catch (e: Exception) { /* ignore */ }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        try { widgetHost.stopListening() } catch (e: Exception) { /* ignore */ }
+    }
+
     private fun readSeed(): Int? =
         if (Build.VERSION.SDK_INT >= 27) wm?.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.primaryColor?.toArgb()
         else null
@@ -96,13 +110,22 @@ class MainActivity : ComponentActivity() {
         super.onBackPressed()
     }
 
-    fun launchApp(app: AppInfo) {
+    fun launchApp(app: AppInfo, origin: Rect? = null) {
         try {
             val i = Intent(Intent.ACTION_MAIN)
                 .addCategory(Intent.CATEGORY_LAUNCHER)
                 .setComponent(ComponentName(app.pkg, app.cls))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-            startActivity(i, ActivityOptions.makeCustomAnimation(this, android.R.anim.fade_in, android.R.anim.fade_out).toBundle())
+            val opts = if (origin != null) {
+                ActivityOptions.makeScaleUpAnimation(
+                    window.decorView,
+                    origin.left.toInt(), origin.top.toInt(),
+                    origin.width.toInt().coerceAtLeast(1), origin.height.toInt().coerceAtLeast(1),
+                )
+            } else {
+                ActivityOptions.makeCustomAnimation(this, android.R.anim.fade_in, android.R.anim.fade_out)
+            }
+            startActivity(i, opts.toBundle())
         } catch (e: Exception) {
             Toast.makeText(this, "Can't open ${app.label}", Toast.LENGTH_SHORT).show()
         }

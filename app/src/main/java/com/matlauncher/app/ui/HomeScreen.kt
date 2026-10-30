@@ -1,5 +1,6 @@
 package com.matlauncher.app.ui
 
+import android.appwidget.AppWidgetHost
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -41,6 +43,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.matlauncher.app.data.AppInfo
 import com.matlauncher.app.data.LauncherSettings
+import com.matlauncher.app.data.PhotoShape
+import com.matlauncher.app.data.WeatherStyle
 import com.matlauncher.app.weather.WeatherData
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -51,8 +55,9 @@ fun HomeScreen(
     weather: WeatherData?,
     actions: LauncherActions,
     homeSignal: Int,
+    widgetHost: AppWidgetHost,
 ) {
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    val pagerState = rememberPagerState(pageCount = { 3 })
     LaunchedEffect(homeSignal) {
         if (pagerState.currentPage != 0) pagerState.animateScrollToPage(0)
     }
@@ -80,7 +85,11 @@ fun HomeScreen(
             }
     ) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            if (page == 0) HomePage(apps, settings, weather, actions) else TodayPage(settings, actions)
+            when (page) {
+                0 -> HomePage(apps, settings, weather, actions)
+                1 -> TodayPage(settings, actions)
+                else -> WidgetsPage(settings, widgetHost)
+            }
         }
 
         Column(
@@ -91,7 +100,7 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(Modifier.padding(bottom = 8.dp)) {
-                repeat(2) { i ->
+                repeat(3) { i ->
                     val active = i == pagerState.currentPage
                     Box(
                         Modifier
@@ -127,17 +136,29 @@ private fun HomePage(
     ) {
         AtAGlance(weather, settings, Modifier.padding(start = 8.dp, bottom = 4.dp))
 
-        if (settings.showClock || settings.showWeather) {
-            Row(
-                Modifier.fillMaxWidth().height(172.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (settings.showWeather) {
-                    WeatherWidget(weather, settings, onClick = actions.openWeatherApp, modifier = Modifier.weight(1.25f).fillMaxSize())
+        if (settings.weatherStyle == WeatherStyle.CARD) {
+            if (settings.showClock || settings.showWeather) {
+                Row(
+                    Modifier.fillMaxWidth().height(172.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (settings.showWeather) {
+                        WeatherWidget(weather, settings, onClick = actions.openWeatherApp, modifier = Modifier.weight(1.25f).fillMaxSize())
+                    }
+                    if (settings.showClock) {
+                        ClockWidget(settings, Modifier.weight(1f).fillMaxSize(), compact = true)
+                    }
                 }
-                if (settings.showClock) {
-                    ClockWidget(settings, Modifier.weight(1f).fillMaxSize())
-                }
+            }
+        } else {
+            if (settings.showWeather) {
+                WeatherWidget(
+                    weather, settings, onClick = actions.openWeatherApp,
+                    modifier = Modifier.fillMaxWidth().height(weatherHeight(settings.weatherStyle)),
+                )
+            }
+            if (settings.showClock) {
+                ClockWidget(settings, Modifier.fillMaxWidth().height(clockHeight(settings.clockStyle)))
             }
         }
 
@@ -173,7 +194,14 @@ private fun TodayPage(settings: LauncherSettings, actions: LauncherActions) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (settings.showPhoto) {
-            PhotoWidget(settings, onAdd = actions.pickPhotos, modifier = Modifier.weight(1f))
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                PhotoWidget(
+                    settings,
+                    onAdd = actions.pickPhotos,
+                    modifier = if (settings.photoShape == PhotoShape.ROUNDED) Modifier.fillMaxSize()
+                    else Modifier.fillMaxWidth().aspectRatio(1f),
+                )
+            }
         } else {
             Spacer(Modifier.weight(1f))
         }

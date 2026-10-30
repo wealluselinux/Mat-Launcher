@@ -10,6 +10,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -62,6 +65,7 @@ fun MatApp(activity: MainActivity) {
     var showWallpapers by remember { mutableStateOf(false) }
     var weatherInstalled by remember { mutableStateOf(WeatherInstaller.isInstalled(ctx)) }
     var pendingIconApp by remember { mutableStateOf<AppInfo?>(null) }
+    var launching by remember { mutableStateOf<LaunchRequest?>(null) }
     val sys = remember { SystemControls(ctx) }
 
     DisposableEffect(Unit) {
@@ -147,8 +151,11 @@ fun MatApp(activity: MainActivity) {
     val actions = remember {
         LauncherActions(
             launch = { app ->
-                overlay = Overlay.None
-                activity.launchApp(app)
+                if (launching == null) {
+                    val origin = LaunchOrigin.consume()
+                    overlay = Overlay.None
+                    launching = LaunchRequest(app, origin)
+                }
             },
             openDrawer = { overlay = Overlay.Drawer },
             openControl = { overlay = Overlay.Control },
@@ -195,7 +202,7 @@ fun MatApp(activity: MainActivity) {
         settings = settings,
         weather = weather,
         battery = { sys.refresh(); sys.battery },
-        launch = { app -> overlay = Overlay.None; activity.launchApp(app) },
+        launch = { app -> actions.launch(app) },
         setTorch = { sys.setTorch(it) },
         openWallpaper = { overlay = Overlay.None; showWallpapers = true },
         openSettings = { overlay = Overlay.Settings },
@@ -211,13 +218,18 @@ fun MatApp(activity: MainActivity) {
 
     val locked by activity.locked
 
-    BackHandler(enabled = locked || overlay != Overlay.None) {
+    val onboarded = settings.onboarded
+    BackHandler(enabled = locked || overlay != Overlay.None || !onboarded) {
         if (!locked) overlay = Overlay.None
     }
 
+    val homeScale by animateFloatAsState(if (onboarded) 1f else 0.92f, tween(650), label = "homeScale")
+    val homeAlpha by animateFloatAsState(if (onboarded) 1f else 0f, tween(650), label = "homeAlpha")
+
     MatTheme(seed = activity.wallpaperSeed.value) {
         Box(Modifier.fillMaxSize()) {
-            HomeScreen(repo.apps, settings, weather, actions, activity.homeSignal.intValue)
+          Box(Modifier.fillMaxSize().graphicsLayer { scaleX = homeScale; scaleY = homeScale; alpha = homeAlpha }) {
+            HomeScreen(repo.apps, settings, weather, actions, activity.homeSignal.intValue, activity.widgetHost)
 
             AnimatedVisibility(
                 visible = overlay == Overlay.Drawer,
@@ -264,7 +276,7 @@ fun MatApp(activity: MainActivity) {
                 enter = fadeIn(tween(200)),
                 exit = slideOutVertically(tween(300)) { -it } + fadeOut(),
             ) {
-                LockScreen(locked, settings, onUnlock = { activity.locked.value = false })
+                LockScreen(locked, settings, sys, onUnlock = { activity.locked.value = false })
             }
 
             if (showWallpapers) {
@@ -292,6 +304,28 @@ fun MatApp(activity: MainActivity) {
                         TextButton(onClick = { showInstall = false; WeatherInstaller.install(ctx) }) { Text("Install") }
                     },
                     dismissButton = { TextButton(onClick = { showInstall = false }) { Text("Not now") } },
+                )
+            }
+            launching?.let { req ->
+                LaunchAnimation(
+                    req,
+                    onStart = { app, rect -> activity.launchApp(app, rect) },
+                    onDone = { launching = null },
+                )
+            }
+          }
+
+            AnimatedVisibility(
+                visible = !onboarded,
+                enter = fadeIn(),
+                exit = fadeOut(tween(650)) + scaleOut(tween(650), targetScale = 1.12f),
+            ) {
+                Onboarding(
+                    apps = repo.apps,
+                    settings = settings,
+                    actions = actions,
+                    weatherInstalled = weatherInstalled,
+                    onFinish = { settings.onboarded = true },
                 )
             }
         }

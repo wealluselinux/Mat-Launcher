@@ -36,6 +36,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -60,6 +63,7 @@ fun AppCell(
     val ctx = LocalContext.current
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
+    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val label = settings.labelFor(app.key, app.label)
 
     Box(modifier) {
@@ -67,7 +71,14 @@ fun AppCell(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(20.dp))
-                .combinedClickable(onClick = { actions.launch(app) }, onLongClick = { menu = true })
+                .onGloballyPositioned { coords = it }
+                .combinedClickable(
+                    onClick = {
+                        LaunchOrigin.rect = try { coords?.boundsInRoot() } catch (e: Exception) { null }
+                        actions.launch(app)
+                    },
+                    onLongClick = { menu = true },
+                )
                 .padding(vertical = 6.dp, horizontal = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {

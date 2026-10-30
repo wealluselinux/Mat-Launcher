@@ -30,6 +30,25 @@ enum class IconStyle(val label: String) {
     GLASS("Glass")
 }
 
+enum class ClockStyle(val label: String) {
+    STACKED("Stacked"),
+    DIGITAL("Digital"),
+    ANALOG("Analog"),
+    MINIMAL("Minimal")
+}
+
+enum class WeatherStyle(val label: String) {
+    CARD("Card"),
+    PILL("Pill"),
+    MINIMAL("Minimal")
+}
+
+enum class PhotoShape(val label: String) {
+    ROUNDED("Rounded"),
+    COOKIE("Cookie"),
+    CIRCLE("Circle")
+}
+
 /** A SharedPreferences-backed value that is also Compose state. */
 class StatePref<T>(
     private val sp: SharedPreferences,
@@ -83,6 +102,15 @@ class LauncherSettings(private val context: Context) {
     var showWeather by boolPref("showWeather", true)
     var showPhoto by boolPref("showPhoto", true)
     var clockAnalog by boolPref("clockAnalog", false)
+    var clockStyle by enumPref("clockStyle", ClockStyle.STACKED, ClockStyle.values())
+    var weatherStyle by enumPref("weatherStyle", WeatherStyle.CARD, WeatherStyle.values())
+    var photoShape by enumPref("photoShape", PhotoShape.ROUNDED, PhotoShape.values())
+    var onboarded by boolPref("onboarded", false)
+
+    // ---- hosted (third party) widgets ----
+    private var widgetIdsRaw by stringPref("widgetIds", "")
+    val widgetIds: List<Int> get() = split(widgetIdsRaw).mapNotNull { it.toIntOrNull() }
+    fun setWidgetIds(list: List<Int>) { widgetIdsRaw = list.joinToString("|") }
 
     // ---- weather ----
     var cityName by stringPref("cityName", "New York")

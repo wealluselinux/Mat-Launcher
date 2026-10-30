@@ -58,7 +58,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.matlauncher.app.data.ClockStyle
 import com.matlauncher.app.data.LauncherSettings
+import com.matlauncher.app.data.PhotoShape
+import com.matlauncher.app.data.WeatherStyle
 import com.matlauncher.app.util.ImageTools
 import com.matlauncher.app.weather.WeatherData
 import com.matlauncher.app.weather.conditionLabel
@@ -125,53 +128,81 @@ fun AtAGlance(weather: WeatherData?, settings: LauncherSettings, modifier: Modif
 // ------------------------------------------------------------------ clock
 
 @Composable
-fun ClockWidget(settings: LauncherSettings, modifier: Modifier = Modifier) {
+fun ClockWidget(settings: LauncherSettings, modifier: Modifier = Modifier, compact: Boolean = false) {
     val now by rememberNow()
     val ctx = LocalContext.current
     val scheme = MaterialTheme.colorScheme
     val is24 = DateFormat.is24HourFormat(ctx)
     val hh = SimpleDateFormat(if (is24) "HH" else "hh", Locale.getDefault()).format(Date(now))
     val mm = SimpleDateFormat("mm", Locale.getDefault()).format(Date(now))
+    val date = SimpleDateFormat("EEEE, d MMM", Locale.getDefault()).format(Date(now))
 
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(40.dp),
-        color = scheme.primaryContainer,
-        contentColor = scheme.onPrimaryContainer,
-    ) {
-        if (settings.clockAnalog) {
-            Box(Modifier.fillMaxSize().padding(14.dp), contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier.fillMaxSize().clip(CookieShape).background(scheme.secondaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AnalogClock(now, Modifier.fillMaxSize().padding(16.dp))
-                }
+    when (settings.clockStyle) {
+        ClockStyle.MINIMAL -> {
+            Column(modifier, verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.Start) {
+                Text(
+                    "$hh:$mm",
+                    color = Color.White,
+                    fontSize = if (compact) 48.sp else 72.sp,
+                    fontWeight = FontWeight.Light,
+                    style = MaterialTheme.typography.displayLarge.merge(OnWallpaper),
+                )
+                if (!compact) Text(date, color = Color.White, style = MaterialTheme.typography.titleMedium.merge(OnWallpaper))
             }
-        } else {
-            Column(
-                Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    hh,
-                    fontSize = 72.sp,
-                    lineHeight = 64.sp,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    mm,
-                    fontSize = 72.sp,
-                    lineHeight = 64.sp,
-                    fontWeight = FontWeight.Black,
-                    color = scheme.primary,
-                    textAlign = TextAlign.Center,
-                )
+        }
+        else -> Surface(
+            modifier = modifier,
+            shape = RoundedCornerShape(40.dp),
+            color = scheme.primaryContainer,
+            contentColor = scheme.onPrimaryContainer,
+        ) {
+            when (settings.clockStyle) {
+                ClockStyle.ANALOG -> Box(Modifier.fillMaxSize().padding(14.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.fillMaxSize().clip(CookieShape).background(scheme.secondaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AnalogClock(now, Modifier.fillMaxSize().padding(16.dp))
+                    }
+                }
+                ClockStyle.DIGITAL -> Column(
+                    Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        "$hh:$mm",
+                        fontSize = if (compact) 38.sp else 68.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (!compact) Text(date, style = MaterialTheme.typography.titleMedium)
+                }
+                else -> Column(
+                    Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(hh, fontSize = 72.sp, lineHeight = 64.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
+                    Text(
+                        mm,
+                        fontSize = 72.sp,
+                        lineHeight = 64.sp,
+                        fontWeight = FontWeight.Black,
+                        color = scheme.primary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }
+}
+
+/** Natural height of the clock when it is laid out full width. */
+fun clockHeight(style: ClockStyle) = when (style) {
+    ClockStyle.STACKED -> 160.dp
+    ClockStyle.DIGITAL -> 130.dp
+    ClockStyle.ANALOG -> 210.dp
+    ClockStyle.MINIMAL -> 110.dp
 }
 
 @Composable
@@ -227,7 +258,13 @@ fun weatherIcon(code: Int, isDay: Boolean): ImageVector = when (code) {
     else -> Icons.Rounded.WbCloudy
 }
 
-/** Pixel-style weather card: city, big temperature, condition badge, precipitation / humidity / wind. */
+fun weatherHeight(style: WeatherStyle) = when (style) {
+    WeatherStyle.CARD -> 172.dp
+    WeatherStyle.PILL -> 84.dp
+    WeatherStyle.MINIMAL -> 60.dp
+}
+
+/** Weather widget in three looks: Pixel-style card, pill, or minimal text. */
 @Composable
 fun WeatherWidget(
     weather: WeatherData?,
@@ -236,10 +273,40 @@ fun WeatherWidget(
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val f = settings.useFahrenheit
+
+    if (settings.weatherStyle == WeatherStyle.MINIMAL) {
+        Row(
+            modifier.clickable { onClick() }.padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (weather == null) {
+                Text("Loading weather…", color = Color.White, style = MaterialTheme.typography.titleMedium.merge(OnWallpaper))
+            } else {
+                Icon(weatherIcon(weather.code, weather.isDay), null, Modifier.size(34.dp), tint = Color.White)
+                Text(
+                    tempString(weather.tempC, f),
+                    color = Color.White,
+                    fontSize = 34.sp,
+                    style = MaterialTheme.typography.headlineMedium.merge(OnWallpaper),
+                )
+                Text(
+                    conditionLabel(weather.code) + " · " + settings.cityName,
+                    color = Color.White.copy(alpha = 0.92f),
+                    style = MaterialTheme.typography.titleSmall.merge(OnWallpaper),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        return
+    }
+
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(36.dp),
+        shape = if (settings.weatherStyle == WeatherStyle.PILL) RoundedCornerShape(50) else RoundedCornerShape(36.dp),
         color = scheme.surfaceContainerHigh,
         contentColor = scheme.onSurface,
     ) {
@@ -247,24 +314,31 @@ fun WeatherWidget(
             Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.CenterStart) {
                 Text("Loading weather for ${settings.cityName}…", style = MaterialTheme.typography.titleSmall)
             }
+        } else if (settings.weatherStyle == WeatherStyle.PILL) {
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Box(
+                    Modifier.size(52.dp).clip(CookieShape).background(scheme.tertiaryContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(weatherIcon(weather.code, weather.isDay), null, Modifier.size(28.dp), tint = scheme.onTertiaryContainer)
+                }
+                Text(tempString(weather.tempC, f), fontSize = 36.sp, fontWeight = FontWeight.Medium)
+                Column(Modifier.weight(1f)) {
+                    Text(settings.cityName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(conditionLabel(weather.code), style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+            }
         } else {
-            val f = settings.useFahrenheit
             val wind = if (f) "${(weather.windKmh * 0.621371).toInt()} mph" else "${weather.windKmh.toInt()} km/h"
             Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 14.dp)) {
                 Row(verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f)) {
-                        Text(
-                            settings.cityName,
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            tempString(weather.tempC, f),
-                            fontSize = 44.sp,
-                            lineHeight = 48.sp,
-                            fontWeight = FontWeight.Normal,
-                        )
+                        Text(settings.cityName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(tempString(weather.tempC, f), fontSize = 44.sp, lineHeight = 48.sp, fontWeight = FontWeight.Normal)
                     }
                     Box(
                         Modifier.size(52.dp).clip(CookieShape).background(scheme.tertiaryContainer),
@@ -308,9 +382,14 @@ fun PhotoWidget(settings: LauncherSettings, onAdd: () -> Unit, modifier: Modifie
         }
     }
 
+    val shape: androidx.compose.ui.graphics.Shape = when (settings.photoShape) {
+        PhotoShape.ROUNDED -> RoundedCornerShape(44.dp)
+        PhotoShape.COOKIE -> CookieShape
+        PhotoShape.CIRCLE -> CircleShape
+    }
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(44.dp),
+        shape = shape,
         color = scheme.secondaryContainer,
     ) {
         Box(

@@ -16,6 +16,10 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import com.matlauncher.app.R
 
 /** Soft shadow so white text stays readable on any wallpaper. */
 val OnWallpaper = TextStyle(
@@ -35,7 +39,7 @@ fun MatTheme(seed: Int?, content: @Composable () -> Unit) {
             if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
         else -> fallbackScheme(seed?.let { Color(it) } ?: Color(0xFF6750A4), dark)
     }
-    MaterialTheme(colorScheme = scheme, typography = Typography(), content = content)
+    MaterialTheme(colorScheme = scheme, typography = Typography().withFont(GoogleSans), content = content)
 }
 
 private fun fallbackScheme(p: Color, dark: Boolean): ColorScheme {
@@ -75,4 +79,29 @@ private fun darkToLight(p: Color): ColorScheme = lightColorScheme(
     surfaceContainer = Color(0xFFF3EDF7),
     surfaceContainerHigh = Color(0xFFECE6F0),
     surfaceContainerHighest = Color(0xFFE6E0E9),
+)
+
+/** Google Sans (SIL Open Font License), bundled in res/font. */
+val GoogleSans = FontFamily(
+    Font(R.font.google_sans_regular, FontWeight.Normal),
+    Font(R.font.google_sans_medium, FontWeight.Medium),
+    Font(R.font.google_sans_bold, FontWeight.Bold),
+)
+
+private fun Typography.withFont(f: FontFamily) = copy(
+    displayLarge = displayLarge.copy(fontFamily = f),
+    displayMedium = displayMedium.copy(fontFamily = f),
+    displaySmall = displaySmall.copy(fontFamily = f),
+    headlineLarge = headlineLarge.copy(fontFamily = f),
+    headlineMedium = headlineMedium.copy(fontFamily = f),
+    headlineSmall = headlineSmall.copy(fontFamily = f),
+    titleLarge = titleLarge.copy(fontFamily = f),
+    titleMedium = titleMedium.copy(fontFamily = f),
+    titleSmall = titleSmall.copy(fontFamily = f),
+    bodyLarge = bodyLarge.copy(fontFamily = f),
+    bodyMedium = bodyMedium.copy(fontFamily = f),
+    bodySmall = bodySmall.copy(fontFamily = f),
+    labelLarge = labelLarge.copy(fontFamily = f),
+    labelMedium = labelMedium.copy(fontFamily = f),
+    labelSmall = labelSmall.copy(fontFamily = f),
 )

@@ -135,9 +135,19 @@ fun SettingsScreen(
                 Header("Home & widgets")
                 Card {
                     SwitchRow("Clock widget", settings.showClock) { settings.showClock = it }
-                    SwitchRow("Analog clock", settings.clockAnalog) { settings.clockAnalog = it }
+                    Label("Clock style")
+                    Chips(com.matlauncher.app.data.ClockStyle.values().toList(), settings.clockStyle, { it.label }) { settings.clockStyle = it }
                     SwitchRow("Weather widget", settings.showWeather) { settings.showWeather = it }
+                    Label("Weather style")
+                    Chips(com.matlauncher.app.data.WeatherStyle.values().toList(), settings.weatherStyle, { it.label }) { settings.weatherStyle = it }
                     SwitchRow("Photo widget", settings.showPhoto) { settings.showPhoto = it }
+                    Label("Photo shape")
+                    Chips(com.matlauncher.app.data.PhotoShape.values().toList(), settings.photoShape, { it.label }) { settings.photoShape = it }
+                    Text(
+                        "Add widgets from other apps on the Widgets page (swipe left twice on the home screen).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
                     SwitchRow("Fahrenheit", settings.useFahrenheit) { settings.useFahrenheit = it }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -201,9 +211,17 @@ fun SettingsScreen(
                     }
                 }
 
+                Header("Permissions")
+                Card { PermissionRows() }
+
+                Header("Welcome screen")
+                Card {
+                    FilledTonalButton(onClick = { settings.onboarded = false; onBack() }) { Text("Run setup again") }
+                }
+
                 Header("About")
                 Card {
-                    Text("Mat Launcher 1.1.0", style = MaterialTheme.typography.titleMedium)
+                    Text("Mat Launcher 1.2.0", style = MaterialTheme.typography.titleMedium)
                     Text(
                         "Open source, Material You only. github.com/wealluselinux/Mat-Launcher",
                         style = MaterialTheme.typography.bodySmall,
@@ -253,7 +271,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun Header(text: String) {
+internal fun Header(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.titleSmall,
@@ -263,12 +281,12 @@ private fun Header(text: String) {
 }
 
 @Composable
-private fun Label(text: String) {
+internal fun Label(text: String) {
     Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @Composable
-private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+internal fun Card(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
@@ -279,7 +297,7 @@ private fun Card(content: @Composable androidx.compose.foundation.layout.ColumnS
 }
 
 @Composable
-private fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(title, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Switch(checked = checked, onCheckedChange = onChange)
@@ -287,7 +305,7 @@ private fun SwitchRow(title: String, checked: Boolean, onChange: (Boolean) -> Un
 }
 
 @Composable
-private fun <T> Chips(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
+internal fun <T> Chips(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { o ->
             FilterChip(selected = o == selected, onClick = { onSelect(o) }, label = { Text(label(o)) })
@@ -345,7 +363,7 @@ fun CitySearchDialog(onDismiss: () -> Unit, onPick: (GeoResult) -> Unit) {
 }
 
 @Composable
-private fun PinDialog(settings: LauncherSettings, onDismiss: () -> Unit) {
+internal fun PinDialog(settings: LauncherSettings, onDismiss: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
