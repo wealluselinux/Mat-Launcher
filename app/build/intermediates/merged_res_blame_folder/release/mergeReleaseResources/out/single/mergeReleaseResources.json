@@ -1,0 +1,34 @@
+[
+    {
+        "merged": "com.matlauncher.app-release-42:/xml_file_paths.xml.flat",
+        "source": "com.matlauncher.app-main-43:/xml/file_paths.xml"
+    },
+    {
+        "merged": "com.matlauncher.app-release-42:/font_google_sans_regular.ttf.flat",
+        "source": "com.matlauncher.app-main-43:/font/google_sans_regular.ttf"
+    },
+    {
+        "merged": "com.matlauncher.app-release-42:/font_google_sans_bold.ttf.flat",
+        "source": "com.matlauncher.app-main-43:/font/google_sans_bold.ttf"
+    },
+    {
+        "merged": "com.matlauncher.app-release-42:/drawable_ic_mono.xml.flat",
+        "source": "com.matlauncher.app-main-43:/drawable/ic_mono.xml"
+    },
+    {
+        "merged": "com.matlauncher.app-release-42:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.matlauncher.app-main-43:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.matlauncher.app-release-42:/drawable_ic_fg.xml.flat",
+        "source": "com.matlauncher.app-main-43:/drawable/ic_fg.xml"
+    },
+    {
+        "merged": "com.matlauncher.app-release-42:/xml_accessibility_service_config.xml.flat",
+        "source": "com.matlauncher.app-main-43:/xml/accessibility_service_config.xml"
+    },
+    {
+        "merged": "com.matlauncher.app-release-42:/font_google_sans_medium.ttf.flat",
+        "source": "com.matlauncher.app-main-43:/font/google_sans_medium.ttf"
+    }
+]

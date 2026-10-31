@@ -1,0 +1,136 @@
+Downloading https://services.gradle.org/distributions/gradle-8.9-bin.zip
+............10%.............20%.............30%.............40%.............50%.............60%.............70%.............80%.............90%.............100%
+
+Welcome to Gradle 8.9!
+
+Here are the highlights of this release:
+ - Enhanced Error and Warning Messages
+ - IDE Integration Improvements
+ - Daemon JVM Information
+
+For more details see https://docs.gradle.org/8.9/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :weather:preBuild UP-TO-DATE
+> Task :weather:preReleaseBuild UP-TO-DATE
+> Task :weather:mergeReleaseJniLibFolders
+> Task :weather:mergeReleaseNativeLibs
+
+> Task :weather:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so.
+
+> Task :weather:buildKotlinToolingMetadata
+> Task :weather:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :weather:extractReleaseNativeSymbolTables
+> Task :weather:checkReleaseDuplicateClasses
+> Task :weather:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :weather:generateReleaseResValues
+> Task :weather:checkReleaseAarMetadata
+> Task :weather:mapReleaseSourceSetPaths
+> Task :weather:generateReleaseResources
+> Task :weather:packageReleaseResources
+> Task :weather:mergeReleaseResources
+> Task :weather:createReleaseCompatibleScreenManifests
+> Task :weather:extractDeepLinksRelease
+> Task :weather:parseReleaseLocalResources
+> Task :weather:processReleaseMainManifest
+> Task :weather:processReleaseManifest
+> Task :weather:javaPreCompileRelease
+> Task :weather:desugarReleaseFileDependencies
+> Task :weather:mergeReleaseStartupProfile
+> Task :weather:processReleaseManifestForPackage
+> Task :weather:mergeExtDexRelease
+> Task :weather:mergeReleaseArtProfile
+> Task :weather:mergeReleaseShaders
+> Task :weather:compileReleaseShaders NO-SOURCE
+> Task :weather:generateReleaseAssets UP-TO-DATE
+> Task :weather:mergeReleaseAssets
+> Task :weather:compressReleaseAssets
+> Task :weather:extractReleaseVersionControlInfo
+> Task :weather:collectReleaseDependencies
+> Task :weather:sdkReleaseDependencyData
+> Task :weather:validateSigningRelease
+> Task :weather:writeReleaseAppMetadata
+> Task :weather:writeReleaseSigningConfigVersions
+> Task :weather:processReleaseResources
+> Task :weather:optimizeReleaseResources
+> Task :weather:compileReleaseKotlin
+> Task :weather:compileReleaseJavaWithJavac NO-SOURCE
+> Task :weather:dexBuilderRelease
+> Task :weather:mergeReleaseGlobalSynthetics
+> Task :weather:processReleaseJavaRes
+> Task :weather:mergeReleaseJavaResource
+> Task :weather:mergeDexRelease
+> Task :weather:compileReleaseArtProfile
+> Task :weather:packageRelease
+> Task :weather:createReleaseApkListingFileRedirect
+> Task :weather:assembleRelease
+
+BUILD SUCCESSFUL in 3m 4s
+43 actionable tasks: 43 executed
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.9/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders
+> Task :app:mergeReleaseNativeLibs
+
+> Task :app:stripReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so.
+
+> Task :app:checkReleaseDuplicateClasses
+> Task :app:buildKotlinToolingMetadata
+> Task :app:extractReleaseNativeSymbolTables FROM-CACHE
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateReleaseResValues FROM-CACHE
+> Task :app:checkReleaseAarMetadata
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease FROM-CACHE
+> Task :app:parseReleaseLocalResources
+> Task :app:mergeReleaseResources
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:javaPreCompileRelease FROM-CACHE
+> Task :app:desugarReleaseFileDependencies FROM-CACHE
+> Task :app:mergeReleaseStartupProfile
+> Task :app:processReleaseManifestForPackage
+> Task :app:mergeReleaseArtProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:collectReleaseDependencies
+> Task :app:processReleaseResources
+> Task :app:sdkReleaseDependencyData
+> Task :app:compressReleaseAssets
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:optimizeReleaseResources
+> Task :app:mergeExtDexRelease
+> Task :app:compileReleaseKotlin
+w: file:///home/runner/work/Mat-Launcher/Mat-Launcher/app/src/main/java/com/matlauncher/app/MainActivity.kt:128:15 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///home/runner/work/Mat-Launcher/Mat-Launcher/app/src/main/java/com/matlauncher/app/ui/HostedWidgets.kt:182:41 'fun updateAppWidgetSize(p0: Bundle!, p1: Int, p2: Int, p3: Int, p4: Int): Unit' is deprecated. Deprecated in Java.
+
+> Task :app:compileReleaseJavaWithJavac NO-SOURCE
+> Task :app:dexBuilderRelease
+> Task :app:mergeReleaseGlobalSynthetics FROM-CACHE
+> Task :app:processReleaseJavaRes
+> Task :app:mergeReleaseJavaResource
+> Task :app:mergeDexRelease
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+
+BUILD SUCCESSFUL in 1m 8s
+43 actionable tasks: 37 executed, 6 from cache
