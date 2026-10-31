@@ -97,7 +97,7 @@ val NEW_FEATURES = listOf(
         Icons.Rounded.OpenWith,
     ),
     NewFeature(
-        "1.7.0", "Folders",
+        "1.6.0", "Folders",
         "In edit mode, drop an app onto the middle of another app to make a folder. Tap a folder to open it, rename it, or take apps back out.",
         Icons.Rounded.Folder,
     ),
