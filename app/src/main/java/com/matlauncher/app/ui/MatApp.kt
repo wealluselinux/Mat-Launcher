@@ -404,6 +404,24 @@ fun MatApp(activity: MainActivity) {
             }
           }
 
+            val currentVersion = updater.installedLauncherVersion(LocalContext.current)
+            var whatsNewFrom by remember { mutableStateOf<String?>(null) }
+            LaunchedEffect(onboarded) {
+                if (onboarded && whatsNewFrom == null) {
+                    val last = settings.lastSeenVersion.ifEmpty { "1.4.0" }
+                    if (Updater.isNewer(currentVersion, last)) {
+                        if (newFeaturesSince(last).isNotEmpty()) whatsNewFrom = last
+                        else settings.lastSeenVersion = currentVersion
+                    }
+                }
+            }
+            AnimatedVisibility(visible = onboarded && whatsNewFrom != null, enter = fadeIn(), exit = fadeOut()) {
+                WhatsNew(settings, currentVersion, whatsNewFrom ?: currentVersion) {
+                    settings.lastSeenVersion = currentVersion
+                    whatsNewFrom = null
+                }
+            }
+
             AnimatedVisibility(
                 visible = !onboarded,
                 enter = fadeIn(),
@@ -414,7 +432,7 @@ fun MatApp(activity: MainActivity) {
                     settings = settings,
                     actions = actions,
                     weatherInstalled = weatherInstalled,
-                    onFinish = { settings.onboarded = true },
+                    onFinish = { settings.lastSeenVersion = currentVersion; settings.onboarded = true },
                 )
             }
         }

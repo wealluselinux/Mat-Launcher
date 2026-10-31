@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -268,6 +269,70 @@ class LauncherSettings(private val context: Context) {
 
     private fun split(raw: String): List<String> = raw.split("|").filter { it.isNotEmpty() }
 
+    // ---- folders (a folder is an entry in [pinned] whose key starts with "folder:") ----
+    private var foldersRaw by stringPref("folders", "{}")
+    var lastSeenVersion by stringPref("lastSeenVersion", "")
+
+    val folders: Map<String, HomeFolder>
+        get() = try {
+            val o = JSONObject(foldersRaw)
+            o.keys().asSequence().associateWith { id ->
+                val f = o.getJSONObject(id)
+                val arr = f.getJSONArray("apps")
+                HomeFolder(id, f.optString("name", "Folder"), (0 until arr.length()).map { arr.getString(it) })
+            }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+
+    private fun writeFolders(m: Map<String, HomeFolder>) {
+        val o = JSONObject()
+        m.forEach { (id, f) -> o.put(id, JSONObject().put("name", f.name).put("apps", JSONArray(f.apps))) }
+        foldersRaw = o.toString()
+    }
+
+    /** Puts [a] and [b] into a new folder, where [a] was. */
+    fun createFolder(a: String, b: String) {
+        val list = pinned.toMutableList()
+        val i = list.indexOf(a)
+        if (i < 0) return
+        val id = "folder:" + java.lang.Long.toString(System.currentTimeMillis(), 36)
+        list[i] = id
+        list.remove(b)
+        setPinned(list)
+        writeFolders(folders + (id to HomeFolder(id, "Folder", listOf(a, b))))
+    }
+
+    fun addToFolder(id: String, key: String) {
+        val f = folders[id] ?: return
+        if (key in f.apps) return
+        setPinned(pinned - key)
+        writeFolders(folders + (id to f.copy(apps = f.apps + key)))
+    }
+
+    /** Takes an app out of a folder and back onto the home screen. A folder with one app left dissolves. */
+    fun removeFromFolder(id: String, key: String) {
+        val f = folders[id] ?: return
+        val rest = f.apps - key
+        val list = pinned.toMutableList()
+        val i = list.indexOf(id)
+        if (rest.size <= 1) {
+            val back = rest + key
+            if (i >= 0) { list.removeAt(i); list.addAll(i, back) } else list.addAll(back)
+            writeFolders(folders - id)
+        } else {
+            list.add(if (i >= 0) i + 1 else list.size, key)
+            writeFolders(folders + (id to f.copy(apps = rest)))
+        }
+        setPinned(list)
+    }
+
+    fun renameFolder(id: String, name: String) {
+        val f = folders[id] ?: return
+        val n = name.trim().ifEmpty { "Folder" }
+        if (n != f.name) writeFolders(folders + (id to f.copy(name = n)))
+    }
+
     // ---- renamed labels ----
     private var renames by mutableStateOf(loadRenames())
 
@@ -322,3 +387,5 @@ class LauncherSettings(private val context: Context) {
         photosRaw = split(photosRaw).filter { it != file.name }.joinToString("|")
     }
 }
+
+data class HomeFolder(val id: String, val name: String, val apps: List<String>)

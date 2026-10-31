@@ -17,6 +17,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import com.matlauncher.app.data.AppInfo
+import com.matlauncher.app.data.HomeFolder
 import com.matlauncher.app.data.LauncherSettings
 
 /** Shared state for dragging an app around the home screen in edit mode. */
@@ -34,35 +35,37 @@ class AppDragState {
     }
 }
 
-/** An app cell that can be picked up (long-press) and dropped somewhere else while editing. */
+/** One thing on the app grid: an app or a folder. */
+class HomeEntry(val key: String, val app: AppInfo?, val folder: HomeFolder?)
+
+/** A cell that can be picked up (long-press) and dropped somewhere else while editing. */
 @Composable
-fun DraggableApp(
-    app: AppInfo,
-    settings: LauncherSettings,
-    actions: LauncherActions,
+fun DraggableEntry(
+    key: String,
     drag: AppDragState,
     screenWidthPx: Float,
     onDrop: (key: String, pointer: Offset) -> Unit,
     modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
 ) {
-    val dragging = drag.dragKey == app.key
+    val dragging = drag.dragKey == key
     Box(
         modifier
-            .onGloballyPositioned { drag.bounds[app.key] = it.boundsInRoot() }
+            .onGloballyPositioned { drag.bounds[key] = it.boundsInRoot() }
             .alpha(if (dragging) 0.25f else 1f)
     ) {
-        AppCell(app, settings, actions, Modifier)
-        // Covers the cell so taps don't launch the app while editing.
+        content()
+        // Covers the cell so taps don't launch anything while editing.
         Box(
             Modifier
                 .matchParentSize()
-                .pointerInput(app.key) {
+                .pointerInput(key) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = {
-                            val b = drag.bounds[app.key] ?: return@detectDragGesturesAfterLongPress
+                            val b = drag.bounds[key] ?: return@detectDragGesturesAfterLongPress
                             drag.pointer = b.center
                             drag.size = b.size
-                            drag.dragKey = app.key
+                            drag.dragKey = key
                         },
                         onDrag = { change, delta ->
                             change.consume()

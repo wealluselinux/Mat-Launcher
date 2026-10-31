@@ -16,6 +16,8 @@ A **Material You (Material 3) only** Android launcher, inspired by Void Launcher
 - **Pages**: apps flow onto the next page when one fills up (no endless scrolling), and the date / weather top bar can stay on every page like the dock
 - **Settings**: organized into category pages (Updates, Wallpaper, Icons, Home, Lock screen, Control center, Apps, Permissions)
 - **Rearrange**: in edit mode, long-press and drag apps to move them, even between pages
+- **Folders**: drop an app on another in edit mode to make a folder
+- **What's new tour**: after each update, a short screen walks through new features with switches to enable them
 - **Update banner**: Settings opens on a per-version colored banner, with Updates at the top
 - **Top bar**: customize the date / weather header (format, size, alignment) and optionally hide the status bar
 - **First-run welcome**: guided setup for icons, widgets, lock screen and permissions, with a transition to the home screen

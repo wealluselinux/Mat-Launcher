@@ -96,6 +96,7 @@ fun HomeScreen(
     val awm = remember { AppWidgetManager.getInstance(ctx) }
     val pager = rememberPagerState(pageCount = { settings.pageCount })
     val drag = remember { AppDragState() }
+    var openFolder by remember { mutableStateOf<String?>(null) }
     val screenWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) {
         androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx()
     }
@@ -171,8 +172,12 @@ fun HomeScreen(
                     return rows * cols
                 }
 
-                val pinnedApps = settings.pinned.mapNotNull { k -> apps.firstOrNull { it.key == k } }
-                val perPage = mutableListOf<List<AppInfo>>()
+                val allFolders = settings.folders
+                val pinnedApps = settings.pinned.mapNotNull { k ->
+                    if (k.startsWith("folder:")) allFolders[k]?.let { HomeEntry(k, null, it) }
+                    else apps.firstOrNull { it.key == k }?.let { HomeEntry(k, it, null) }
+                }
+                val perPage = mutableListOf<List<HomeEntry>>()
                 var used = 0
                 for (p in 0 until LauncherSettings.MAX_PAGES) {
                     if (used >= pinnedApps.size) break
@@ -190,7 +195,17 @@ fun HomeScreen(
                     val keys = pinnedApps.map { it.key }
                     val from = keys.indexOf(key)
                     if (from < 0) return@drop
-                    val target = drag.bounds.entries.firstOrNull { it.key != key && it.key in keys && it.value.contains(pointer) }?.key
+                    val hit = drag.bounds.entries.firstOrNull { it.key != key && it.key in keys && it.value.contains(pointer) }
+                    val target = hit?.key
+                    // the middle of an app makes a folder; the edges just reorder
+                    if (hit != null && !key.startsWith("folder:")) {
+                        val frac = (pointer.x - hit.value.left) / hit.value.width
+                        if (frac in 0.25f..0.75f) {
+                            if (hit.key.startsWith("folder:")) settings.addToFolder(hit.key, key)
+                            else settings.createFolder(hit.key, key)
+                            return@drop
+                        }
+                    }
                     val list = keys.toMutableList()
                     list.removeAt(from)
                     if (target != null) {
@@ -235,7 +250,7 @@ fun HomeScreen(
 
                         if (editing && pageApps.isNotEmpty()) {
                             Text(
-                                "Long-press an app, then drag it to move it. Hold it at the screen edge to change page.",
+                                "Long-press an app, then drag it to move it. Drop it on another app to make a folder. Hold it at the screen edge to change page.",
                                 style = MaterialTheme.typography.bodySmall.merge(OnWallpaper),
                                 color = Color.White.copy(alpha = 0.85f),
                             )
@@ -243,11 +258,13 @@ fun HomeScreen(
 
                         pageApps.chunked(cols).forEach { row ->
                             Row(Modifier.fillMaxWidth()) {
-                                row.forEach { app ->
+                                row.forEach { entry ->
                                     if (editing) {
-                                        DraggableApp(app, settings, actions, drag, screenWidthPx, onDrop, Modifier.weight(1f))
+                                        DraggableEntry(entry.key, drag, screenWidthPx, onDrop, Modifier.weight(1f)) {
+                                            EntryCell(entry, apps, settings, actions, Modifier) { }
+                                        }
                                     } else {
-                                        AppCell(app, settings, actions, Modifier.weight(1f))
+                                        EntryCell(entry, apps, settings, actions, Modifier.weight(1f)) { openFolder = it }
                                     }
                                 }
                                 repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
@@ -287,8 +304,9 @@ fun HomeScreen(
         }
 
         val dk = drag.dragKey
-        val dragged = if (dk != null) apps.firstOrNull { it.key == dk } else null
-        if (dragged != null) {
+        val dragged = if (dk != null && !dk.startsWith("folder:")) apps.firstOrNull { it.key == dk } else null
+        val draggedFolder = if (dk != null && dk.startsWith("folder:")) settings.folders[dk] else null
+        if (dragged != null || draggedFolder != null) {
             val d = androidx.compose.ui.platform.LocalDensity.current
             Box(
                 Modifier
@@ -296,8 +314,14 @@ fun HomeScreen(
                     .size(with(d) { drag.size.width.toDp() }, with(d) { drag.size.height.toDp() })
                     .graphicsLayer { scaleX = 1.15f; scaleY = 1.15f; alpha = 0.95f }
             ) {
-                AppCell(dragged, settings, actions, Modifier)
+                if (dragged != null) AppCell(dragged, settings, actions, Modifier)
+                else if (draggedFolder != null) FolderCell(draggedFolder, apps, settings) { }
             }
+        }
+
+        val openF = openFolder?.let { settings.folders[it] }
+        if (openF != null) {
+            FolderDialog(openF, apps, settings, actions) { openFolder = null }
         }
 
         Column(
