@@ -70,6 +70,11 @@ enum class LockClockStyle(val label: String) {
     ANALOG("Analog"),
 }
 
+enum class EdgeZone(val label: String) {
+    RIGHT("Top right"),
+    FULL("Full width"),
+}
+
 enum class CcStyle(val label: String) {
     LARGE("Large tiles"),
     COMPACT("Compact icons"),

@@ -1,6 +1,24 @@
 package com.matlauncher.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import com.matlauncher.app.data.EdgeZone
+import com.matlauncher.app.util.MatAccessibilityService
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,6 +62,55 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 
 // ---------------------------------------------------------------------------- updates
+
+/** A gradient per release. 1.3 green, 1.4 amber, 1.5 sky blue, 1.6 purple-black; later ones are seeded random. */
+private fun bannerColors(version: String): Pair<Color, Color> {
+    val parts = version.split('.').mapNotNull { it.toIntOrNull() }
+    val major = parts.getOrElse(0) { 1 }
+    val minor = parts.getOrElse(1) { 0 }
+    val patch = parts.getOrElse(2) { 0 }
+    if (major == 1) when (minor) {
+        2 -> return Color(0xFFE05A8C) to Color(0xFF7B3FA0)
+        3 -> return Color(0xFF2E9E57) to Color(0xFF0B5A34)
+        4 -> return Color(0xFFF2B01E) to Color(0xFFC2661A)
+        5 -> return Color(0xFF5CC8FF) to Color(0xFF2478D6)
+        6 -> return Color(0xFF6B3FD1) to Color(0xFF120A24)
+    }
+    val rnd = java.util.Random((major * 10000L + minor * 100L + patch) * 7919L + 13L)
+    val hue = rnd.nextFloat() * 360f
+    val hue2 = (hue + 25f + rnd.nextFloat() * 50f) % 360f
+    return Color.hsv(hue, 0.65f, 0.9f) to Color.hsv(hue2, 0.8f, 0.4f)
+}
+
+@Composable
+internal fun UpdateBanner(version: String) {
+    val (a, b) = bannerColors(version)
+    val primary = MaterialTheme.colorScheme.primary
+    // a little of the wallpaper palette so it still feels like part of the theme
+    val c1 = lerp(a, primary, 0.15f)
+    val c2 = lerp(b, primary, 0.10f)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(Brush.linearGradient(listOf(c1, c2))),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(170.dp)
+                .align(Alignment.TopEnd)
+                .padding(top = 0.dp)
+                .clip(RoundedCornerShape(85.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Mat Launcher", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelLarge)
+            Text(version, color = Color.White, fontSize = 56.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        }
+    }
+}
 
 @Composable
 internal fun UpdateCard(updater: Updater, settings: LauncherSettings, weatherInstalled: Boolean) {
@@ -141,6 +208,7 @@ internal fun UpdateCard(updater: Updater, settings: LauncherSettings, weatherIns
 internal fun TopBarSettings(settings: LauncherSettings) {
     Card {
         SwitchRow("Show header (date & weather)", settings.topBarShow) { settings.topBarShow = it }
+        SwitchRow("Keep on every home screen", settings.topBarAllPages) { settings.topBarAllPages = it }
         SwitchRow("Show date", settings.topBarDate) { settings.topBarDate = it }
         SwitchRow("Show weather", settings.topBarWeather) { settings.topBarWeather = it }
         Label("Date format")
@@ -236,6 +304,50 @@ internal fun TileListEditor(all: List<TileId>, selected: List<TileId>, max: Int,
                     leadingIcon = { Icon(Icons.Rounded.Add, null) },
                 )
             }
+        }
+    }
+}
+
+
+// ---------------------------------------------------------------------------- over other apps
+
+@Composable
+internal fun OverlaySettings(settings: LauncherSettings) {
+    val ctx = LocalContext.current
+    var tick by remember { mutableIntStateOf(0) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { tick++ }
+    @Suppress("UNUSED_VARIABLE") val recompose = tick
+    val on = MatAccessibilityService.isEnabled(ctx)
+    Card {
+        Text(
+            "Optional. With Mat Launcher's accessibility service on, the control center and lock screen can show on top of other apps. " +
+                "It doesn't read your screen or what you type.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Accessibility service", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    if (on) "On" else "Off. Turn on Mat Launcher in Installed apps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (!on) FilledTonalButton(onClick = { openSystemScreen(ctx, android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS) }) { Text("Open") }
+        }
+        SwitchRow("Control center in every app (swipe down from the top)", settings.ccEverywhere) { settings.ccEverywhere = it }
+        if (settings.ccEverywhere) {
+            Label("Swipe zone")
+            Chips(EdgeZone.values().toList(), settings.ccZone, { it.label }) { settings.ccZone = it }
+        }
+        SwitchRow("Lock screen over other apps", settings.lockEverywhere) { settings.lockEverywhere = it }
+        if ((settings.ccEverywhere || settings.lockEverywhere) && !on) {
+            Text(
+                "These do nothing until the accessibility service is on. If Android says \"Restricted setting\", see the help under Permissions.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

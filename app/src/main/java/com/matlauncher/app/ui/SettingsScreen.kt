@@ -85,6 +85,10 @@ fun SettingsScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                // ---------------- Updates (top)
+                UpdateBanner(updater.installedLauncherVersion(LocalContext.current))
+                UpdateCard(updater, settings, weatherInstalled)
+
                 // ---------------- Wallpaper
                 Header("Wallpaper")
                 Card {
@@ -203,8 +207,8 @@ fun SettingsScreen(
                 Header("Control center")
                 ControlCenterSettings(settings)
 
-                Header("Updates")
-                UpdateCard(updater, settings, weatherInstalled)
+                Header("Over other apps")
+                OverlaySettings(settings)
 
                 // ---------------- Apps
                 Header("Apps")

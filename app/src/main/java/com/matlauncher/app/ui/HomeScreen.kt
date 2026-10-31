@@ -11,6 +11,10 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -72,6 +76,7 @@ import com.matlauncher.app.data.LauncherSettings
 import com.matlauncher.app.data.PhotoShape
 import com.matlauncher.app.data.WeatherStyle
 import com.matlauncher.app.weather.WeatherData
+import kotlin.math.floor
 
 @Composable
 fun HomeScreen(
@@ -85,11 +90,11 @@ fun HomeScreen(
     onEditingChange: (Boolean) -> Unit,
     onPageChanged: (Int) -> Unit,
 ) {
-    val scroll = rememberScrollState()
+    val ctx = LocalContext.current
+    val awm = remember { AppWidgetManager.getInstance(ctx) }
     val pager = rememberPagerState(pageCount = { settings.pageCount })
     LaunchedEffect(homeSignal) {
         if (pager.currentPage != 0) pager.animateScrollToPage(0)
-        scroll.animateScrollTo(0)
     }
     LaunchedEffect(pager.currentPage) { onPageChanged(pager.currentPage) }
     // jump to a page the moment it's added
@@ -98,6 +103,10 @@ fun HomeScreen(
         if (settings.pageCount > lastCount) pager.animateScrollToPage(settings.pageCount - 1)
         lastCount = settings.pageCount
     }
+
+    val hasHeader = settings.topBarShow && (settings.topBarDate || settings.topBarWeather)
+    val fixedHeader = hasHeader && settings.topBarAllPages
+    val inlineHeader = hasHeader && !settings.topBarAllPages
 
     Box(
         Modifier
@@ -121,45 +130,71 @@ fun HomeScreen(
                 )
             }
     ) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-            val pageScroll = if (page == 0) scroll else rememberScrollState()
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-                    .verticalScroll(pageScroll, enabled = pageScroll.maxValue > 0)
-                    .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 200.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (editing) {
-                    EditHeader(
-                        page = page,
-                        pageCount = settings.pageCount,
-                        onAdd = actions.openWidgetPicker,
-                        onAddPage = { settings.addPage() },
-                        onRemovePage = { settings.removePage(page) },
-                        onDone = { onEditingChange(false) },
-                    )
-                }
-                if (page == 0 && settings.topBarShow && (settings.topBarDate || settings.topBarWeather)) {
-                    AtAGlance(weather, settings, Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            // The top bar stays put while you swipe between pages, like the dock does.
+            if (fixedHeader) {
+                AtAGlance(weather, settings, Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp))
+            }
+
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                val topPad = if (fixedHeader) 8.dp else 12.dp
+                val reserveBottom = 200.dp + navBottom
+                val avail = maxHeight - topPad - reserveBottom
+                val live = settings.homeItems.filter { it.kind != HomeKind.HOSTED || awm.getAppWidgetInfo(it.id) != null }
+                val cols = settings.gridColumns
+                val rowH = (56f * settings.iconScale).dp + 12.dp + (if (settings.showLabels) 24.dp else 0.dp) + 4.dp
+
+                // Apps fill each page below its widgets, then spill onto the next page.
+                fun capacity(page: Int): Int {
+                    val widgetsH = widgetsHeight(settings, awm, ctx, page, live)
+                    val header = if (page == 0 && inlineHeader) 76.dp else 0.dp
+                    val remaining = avail - widgetsH - header
+                    val rows = floor((remaining.value + 12f) / (rowH.value + 12f)).toInt().coerceAtLeast(0)
+                    return rows * cols
                 }
 
-                HomeItems(settings, weather, actions, widgetHost, editing, page)
+                val pinnedApps = settings.pinned.mapNotNull { k -> apps.firstOrNull { it.key == k } }
+                val perPage = mutableListOf<List<AppInfo>>()
+                var used = 0
+                for (p in 0 until LauncherSettings.MAX_PAGES) {
+                    if (used >= pinnedApps.size) break
+                    val chunk = pinnedApps.drop(used).take(capacity(p))
+                    perPage += chunk
+                    used += chunk.size
+                }
+                val needed = maxOf(1, perPage.indexOfLast { it.isNotEmpty() } + 1)
+                val leftover = pinnedApps.size - used
+                LaunchedEffect(needed) {
+                    while (settings.pageCount < needed && settings.addPage()) { /* keep adding */ }
+                }
 
-                if (page == 0) {
-                    val pinnedApps = settings.pinned.mapNotNull { k -> apps.firstOrNull { it.key == k } }
-                    val cols = settings.gridColumns
-                    if (pinnedApps.isEmpty()) {
-                        Text(
-                            "Long-press the home screen to add widgets or change styles, or long-press an app in the drawer to add it here",
-                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium.merge(OnWallpaper),
-                            color = Color.White.copy(alpha = 0.85f),
-                        )
-                    } else {
-                        pinnedApps.chunked(cols).take(3).forEach { row ->
+                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                    val pageApps = perPage.getOrNull(page).orEmpty()
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState(), enabled = editing)
+                            .padding(start = 16.dp, end = 16.dp, top = topPad, bottom = reserveBottom),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        if (editing) {
+                            EditHeader(
+                                page = page,
+                                pageCount = settings.pageCount,
+                                onAdd = actions.openWidgetPicker,
+                                onAddPage = { settings.addPage() },
+                                onRemovePage = { settings.removePage(page) },
+                                onDone = { onEditingChange(false) },
+                            )
+                        }
+                        if (page == 0 && inlineHeader) {
+                            AtAGlance(weather, settings, Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                        }
+
+                        HomeItems(settings, weather, actions, widgetHost, editing, page)
+
+                        pageApps.chunked(cols).forEach { row ->
                             Row(Modifier.fillMaxWidth()) {
                                 row.forEach { app ->
                                     AppCell(app, settings, actions, Modifier.weight(1f))
@@ -167,15 +202,35 @@ fun HomeScreen(
                                 repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
+
+                        val hintStyle = MaterialTheme.typography.bodyMedium.merge(OnWallpaper)
+                        if (page == 0 && pinnedApps.isEmpty()) {
+                            Text(
+                                "Long-press the home screen to add widgets or change styles, or long-press an app in the drawer to add it here",
+                                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                                textAlign = TextAlign.Center,
+                                style = hintStyle,
+                                color = Color.White.copy(alpha = 0.85f),
+                            )
+                        } else if (page > 0 && pageApps.isEmpty() && settings.homeItems.none { settings.pageOf(it) == page } && !editing) {
+                            Text(
+                                "This page is empty. Long-press the home screen, then Edit home, to add widgets here. Apps move here automatically when the first page is full.",
+                                modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                                textAlign = TextAlign.Center,
+                                style = hintStyle,
+                                color = Color.White.copy(alpha = 0.85f),
+                            )
+                        }
+                        if (leftover > 0 && page == settings.pageCount - 1) {
+                            Text(
+                                "+$leftover more apps don't fit. Remove a widget or an app from home to make room.",
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.Center,
+                                style = hintStyle,
+                                color = Color.White.copy(alpha = 0.85f),
+                            )
+                        }
                     }
-                } else if (settings.homeItems.none { settings.pageOf(it) == page } && !editing) {
-                    Text(
-                        "This page is empty. Long-press the home screen, then Edit home, to add widgets here.",
-                        modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium.merge(OnWallpaper),
-                        color = Color.White.copy(alpha = 0.85f),
-                    )
                 }
             }
         }
@@ -206,7 +261,7 @@ fun HomeScreen(
             SearchPill(actions)
         }
 
-        // A strip along the top that always opens the control center, even when the page scrolls.
+        // A strip along the top that always opens the control center.
         Box(
             Modifier
                 .align(Alignment.TopCenter)
@@ -224,6 +279,19 @@ fun HomeScreen(
                 .height(22.dp)
         )
     }
+}
+
+/** Height the widgets on [page] take, counting the 12dp gap after every row. */
+private fun widgetsHeight(settings: LauncherSettings, awm: AppWidgetManager, ctx: android.content.Context, page: Int, live: List<HomeItem>): Dp {
+    var h = 0.dp
+    pairRows(live.filter { settings.pageOf(it) == page }).forEach { row ->
+        val hs = row.items.map {
+            if (it.height > 0) it.height.dp
+            else autoHeight(it, row.paired, settings, if (it.kind == HomeKind.HOSTED) awm.getAppWidgetInfo(it.id)?.let { i -> hostedAutoHeightDp(ctx, i) } ?: 160 else 0)
+        }
+        h += hs.maxOf { it } + 12.dp
+    }
+    return h
 }
 
 // ------------------------------------------------------------------------- layout

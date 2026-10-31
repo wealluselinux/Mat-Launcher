@@ -195,6 +195,7 @@ class LauncherSettings(private val context: Context) {
     var topBarSize by enumPref("topBarSize", TextScale.MEDIUM, TextScale.values())
     var topBarDateStyle by enumPref("topBarDateStyle", DateStyle.SHORT, DateStyle.values())
     var hideStatusBar by boolPref("hideStatusBar", false)
+    var topBarAllPages by boolPref("topBarAllPages", true)
 
     // ---- control center ----
     private var ccTilesRaw by stringPref("ccTiles", "INTERNET|BLUETOOTH|FLASHLIGHT|AIRPLANE|ROTATION|DND|LOCATION|AI")
@@ -205,6 +206,9 @@ class LauncherSettings(private val context: Context) {
     var ccShowBrightness by boolPref("ccShowBrightness", true)
     var ccShowVolume by boolPref("ccShowVolume", true)
     var ccShowShortcuts by boolPref("ccShowShortcuts", true)
+    /** Open the control center from any app (needs the accessibility service). */
+    var ccEverywhere by boolPref("ccEverywhere", false)
+    var ccZone by enumPref("ccZone", EdgeZone.RIGHT, EdgeZone.values())
 
     // ---- updates ----
     var autoUpdateCheck by boolPref("autoUpdateCheck", true)
@@ -226,6 +230,8 @@ class LauncherSettings(private val context: Context) {
     var lockShowNotifs by boolPref("lockShowNotifs", true)
     var lockMaxNotifs by intPref("lockMaxNotifs", 5)
     var lockShowToggles by boolPref("lockShowToggles", true)
+    /** Show the lock screen over other apps too (needs the accessibility service). */
+    var lockEverywhere by boolPref("lockEverywhere", false)
     private var lockTilesRaw by stringPref("lockTiles", "INTERNET|BLUETOOTH|FLASHLIGHT|AIRPLANE")
     val lockTiles: List<TileId> get() = TileId.parse(lockTilesRaw)
     fun setLockTiles(list: List<TileId>) { lockTilesRaw = TileId.join(list) }

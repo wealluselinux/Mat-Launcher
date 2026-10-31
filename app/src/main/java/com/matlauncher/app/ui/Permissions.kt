@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.matlauncher.app.util.NotificationStore
 import com.matlauncher.app.util.ShellAccess
+import com.matlauncher.app.util.MatAccessibilityService
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
 
 /** Opens a system screen where the user grants a special permission. */
 fun openSystemScreen(ctx: Context, action: String, withPackage: Boolean = false) {
@@ -82,6 +91,11 @@ fun PermissionRows() {
         PermissionRow(
             "Install apps", "Install the bundled Mat Weather app and updates", install,
         ) { openSystemScreen(ctx, Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, true) }
+
+        PermissionRow(
+            "Accessibility service", "Optional: control center and lock screen over other apps",
+            MatAccessibilityService.isEnabled(ctx),
+        ) { openSystemScreen(ctx, Settings.ACTION_ACCESSIBILITY_SETTINGS) }
 
         // Wi-Fi / Bluetooth / airplane / mobile data can only be switched through Shizuku.
         val shizukuSub = when {
@@ -133,12 +147,40 @@ private fun RestrictedSettingsHelp(ctx: Context) {
                         "2. Tap Open app info below.\n" +
                         "3. Tap the ⋮ menu in the top-right corner, then Allow restricted settings, and confirm with your PIN or fingerprint.\n" +
                         "4. Go back and switch the permission on.\n\n" +
-                        "If you don't see the ⋮ menu, do step 1 first. It only appears after Android has blocked something once.",
+                        "No ⋮ menu on your phone? Some phones hide it, and it only appears after Android has blocked something once. " +
+                        "Use one of these instead:",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 FilledTonalButton(onClick = { openSystemScreen(ctx, Settings.ACTION_APPLICATION_DETAILS_SETTINGS, true) }) {
                     Text("Open app info")
                 }
+                val scope = rememberCoroutineScope()
+                val pkg = ctx.packageName
+                val cmd = "adb shell appops set $pkg ACCESS_RESTRICTED_SETTINGS allow"
+                if (ShellAccess.granted()) {
+                    Text("Shizuku is allowed, so Mat Launcher can do this for you:", style = MaterialTheme.typography.bodyMedium)
+                    Button(onClick = {
+                        scope.launch {
+                            val ok = withContext(Dispatchers.IO) {
+                                ShellAccess.run(listOf("sh", "-c", "appops set $pkg ACCESS_RESTRICTED_SETTINGS allow"))
+                            }
+                            Toast.makeText(ctx, if (ok) "Done. Now switch the permission on" else "That didn't work", Toast.LENGTH_LONG).show()
+                        }
+                    }) { Text("Allow restricted settings") }
+                }
+                Text(
+                    "Or, from a computer with USB debugging on:\n$cmd",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                TextButton(onClick = {
+                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("adb", cmd))
+                    Toast.makeText(ctx, "Copied", Toast.LENGTH_SHORT).show()
+                }) { Text("Copy command") }
+                Text(
+                    "Last resort: reinstall Mat Launcher through the system installer (Files app or Downloads → tap the APK). Apps installed that way are usually not restricted.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Mat Launcher</string>
+    <string name="accessibility_description">Optional. Lets Mat Launcher draw its control center and lock screen on top of other apps. It does not read your screen or what you type.</string>
 </resources>

@@ -26,6 +26,7 @@ import com.matlauncher.app.data.AppInfo
 import com.matlauncher.app.data.AppRepository
 import com.matlauncher.app.data.LauncherSettings
 import com.matlauncher.app.ui.MatApp
+import com.matlauncher.app.util.MatAccessibilityService
 
 class MainActivity : ComponentActivity() {
     lateinit var settings: LauncherSettings
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
     val homeSignal = mutableIntStateOf(0)
     val reloadTick = mutableIntStateOf(0)
     val wallpaperSeed = mutableStateOf<Int?>(null)
+    /** Set when another part of the app (the accessibility overlay) asks for a screen: "ai", "settings", "wallpaper". */
+    val pendingOverlay = mutableStateOf<String?>(null)
 
     val widgetHost: AppWidgetHost by lazy { AppWidgetHost(this, 2026) }
 
@@ -43,7 +46,8 @@ class MainActivity : ComponentActivity() {
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (settings.lockEnabled && settings.lockOnScreenOff) locked.value = true
+            val overlayHandles = settings.lockEverywhere && MatAccessibilityService.instance != null
+            if (settings.lockEnabled && settings.lockOnScreenOff && !overlayHandles) locked.value = true
         }
     }
 
@@ -62,6 +66,7 @@ class MainActivity : ComponentActivity() {
         settings = LauncherSettings(applicationContext)
         repo = AppRepository(applicationContext)
         locked.value = settings.lockEnabled
+        pendingOverlay.value = intent?.getStringExtra("mat_overlay")
 
         ContextCompat.registerReceiver(
             this, screenReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED
@@ -85,6 +90,18 @@ class MainActivity : ComponentActivity() {
         setContent { MatApp(this) }
     }
 
+    override fun onResume() {
+        super.onResume()
+        MatAccessibilityService.launcherVisible = true
+        MatAccessibilityService.refresh()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        MatAccessibilityService.launcherVisible = false
+        MatAccessibilityService.refresh()
+    }
+
     override fun onStart() {
         super.onStart()
         try { widgetHost.startListening() } catch (e: Exception) { /* ignore */ }
@@ -101,6 +118,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        intent.getStringExtra("mat_overlay")?.let { pendingOverlay.value = it }
         if (intent.hasCategory(Intent.CATEGORY_HOME)) homeSignal.intValue++
     }
 

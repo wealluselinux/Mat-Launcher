@@ -12,6 +12,9 @@ A **Material You (Material 3) only** Android launcher, inspired by Void Launcher
 - **App drawer**: swipe up, search, long-press for rename / change icon / hide / uninstall / app info
 - **Control center**: swipe down (or from the very top). Choose which tiles to show and their order, large or compact style, and toggle the clock header, brightness, volume and shortcuts. Real flashlight and volume; Wi-Fi, Bluetooth, Airplane and Location open the system panels (Android doesn't let apps flip them)
 - **Lock screen**: Material You lock screen with notifications and quick toggles. Choose gradient, solid or dimmed-wallpaper background, stacked / one-line / analog clock, alignment, how many notifications, and which toggles. Optional 4-digit PIN. Double-tap the home screen to lock. It is a launcher-level lock layer and does **not** replace the system lock
+- **Over other apps (optional)**: turn on Mat Launcher's accessibility service to get the control center (swipe down from the top edge) and the lock screen on top of any app. It reads nothing from your screen. Both are off by default
+- **Pages**: apps flow onto the next page when one fills up (no endless scrolling), and the date / weather top bar can stay on every page like the dock
+- **Update banner**: Settings opens on a per-version colored banner, with Updates at the top
 - **Top bar**: customize the date / weather header (format, size, alignment) and optionally hide the status bar
 - **First-run welcome**: guided setup for icons, widgets, lock screen and permissions, with a transition to the home screen
 - **Google Sans** font and an app-open animation

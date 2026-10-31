@@ -146,6 +146,17 @@ fun MatApp(activity: MainActivity) {
 
     LaunchedEffect(activity.homeSignal.intValue) { overlay = Overlay.None }
 
+    // screens requested by the over-other-apps control center
+    val pending = activity.pendingOverlay.value
+    LaunchedEffect(pending) {
+        when (pending) {
+            "ai" -> { aiQuery = null; overlay = Overlay.Ai }
+            "settings" -> overlay = Overlay.Settings
+            "wallpaper" -> showWallpapers = true
+        }
+        if (pending != null) activity.pendingOverlay.value = null
+    }
+
     // ---- pickers
     val wallpaperPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) scope.launch {
