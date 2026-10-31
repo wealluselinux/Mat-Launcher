@@ -11,6 +11,8 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -93,6 +95,19 @@ fun HomeScreen(
     val ctx = LocalContext.current
     val awm = remember { AppWidgetManager.getInstance(ctx) }
     val pager = rememberPagerState(pageCount = { settings.pageCount })
+    val drag = remember { AppDragState() }
+    val screenWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+        androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx()
+    }
+    // hold an app near the left/right edge to flip pages while dragging
+    LaunchedEffect(drag.dragKey, drag.edge) {
+        if (drag.dragKey == null || drag.edge == 0) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(650)
+            val next = (pager.currentPage + drag.edge).coerceIn(0, settings.pageCount - 1)
+            if (next != pager.currentPage) pager.animateScrollToPage(next)
+        }
+    }
     LaunchedEffect(homeSignal) {
         if (pager.currentPage != 0) pager.animateScrollToPage(0)
     }
@@ -111,13 +126,15 @@ fun HomeScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
+            .pointerInput(editing) {
+                if (editing) return@pointerInput
                 detectTapGestures(
                     onDoubleTap = { actions.lockNow() },
                     onLongPress = { actions.openHomeMenu() },
                 )
             }
-            .pointerInput(Unit) {
+            .pointerInput(editing) {
+                if (editing) return@pointerInput
                 var total = 0f
                 detectVerticalDragGestures(
                     onDragStart = { total = 0f },
@@ -169,7 +186,29 @@ fun HomeScreen(
                     while (settings.pageCount < needed && settings.addPage()) { /* keep adding */ }
                 }
 
-                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
+                val onDrop: (String, androidx.compose.ui.geometry.Offset) -> Unit = drop@{ key, pointer ->
+                    val keys = pinnedApps.map { it.key }
+                    val from = keys.indexOf(key)
+                    if (from < 0) return@drop
+                    val target = drag.bounds.entries.firstOrNull { it.key != key && it.key in keys && it.value.contains(pointer) }?.key
+                    val list = keys.toMutableList()
+                    list.removeAt(from)
+                    if (target != null) {
+                        list.add(list.indexOf(target).let { t -> if (keys.indexOf(target) > from) t + 1 else t }.coerceIn(0, list.size), key)
+                    } else {
+                        // dropped on empty space: goes to the end of the page you're on
+                        val pg = pager.currentPage
+                        val end = (0..pg).sumOf { perPage.getOrNull(it)?.size ?: 0 }
+                        list.add((if (from < end) end - 1 else end).coerceIn(0, list.size), key)
+                    }
+                    settings.setPinned(list + settings.pinned.filter { it !in keys })
+                }
+
+                HorizontalPager(
+                    state = pager,
+                    modifier = Modifier.fillMaxSize(),
+                    beyondViewportPageCount = if (drag.dragKey != null) LauncherSettings.MAX_PAGES else 0,
+                ) { page ->
                     val pageApps = perPage.getOrNull(page).orEmpty()
                     Column(
                         Modifier
@@ -194,10 +233,22 @@ fun HomeScreen(
 
                         HomeItems(settings, weather, actions, widgetHost, editing, page)
 
+                        if (editing && pageApps.isNotEmpty()) {
+                            Text(
+                                "Long-press an app, then drag it to move it. Hold it at the screen edge to change page.",
+                                style = MaterialTheme.typography.bodySmall.merge(OnWallpaper),
+                                color = Color.White.copy(alpha = 0.85f),
+                            )
+                        }
+
                         pageApps.chunked(cols).forEach { row ->
                             Row(Modifier.fillMaxWidth()) {
                                 row.forEach { app ->
-                                    AppCell(app, settings, actions, Modifier.weight(1f))
+                                    if (editing) {
+                                        DraggableApp(app, settings, actions, drag, screenWidthPx, onDrop, Modifier.weight(1f))
+                                    } else {
+                                        AppCell(app, settings, actions, Modifier.weight(1f))
+                                    }
                                 }
                                 repeat(cols - row.size) { Spacer(Modifier.weight(1f)) }
                             }
@@ -232,6 +283,20 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+        }
+
+        val dk = drag.dragKey
+        val dragged = if (dk != null) apps.firstOrNull { it.key == dk } else null
+        if (dragged != null) {
+            val d = androidx.compose.ui.platform.LocalDensity.current
+            Box(
+                Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset((drag.pointer.x - drag.size.width / 2).toInt(), (drag.pointer.y - drag.size.height / 2).toInt()) }
+                    .size(with(d) { drag.size.width.toDp() }, with(d) { drag.size.height.toDp() })
+                    .graphicsLayer { scaleX = 1.15f; scaleY = 1.15f; alpha = 0.95f }
+            ) {
+                AppCell(dragged, settings, actions, Modifier)
             }
         }
 

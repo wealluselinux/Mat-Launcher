@@ -18,6 +18,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.SystemUpdate
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Wallpaper
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -71,12 +81,17 @@ fun SettingsScreen(
     var cityDialog by remember { mutableStateOf(false) }
     var pinDialog by remember { mutableStateOf(false) }
     var hiddenDialog by remember { mutableStateOf(false) }
+    var section by remember { mutableStateOf<String?>(null) }
+    androidx.activity.compose.BackHandler(enabled = section != null) { section = null }
 
     Surface(Modifier.fillMaxSize(), color = scheme.surface.copy(alpha = 0.98f)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
-                Text("Mat Launcher settings", style = MaterialTheme.typography.titleLarge)
+                IconButton(onClick = { if (section != null) section = null else onBack() }) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+                Text(
+                    SETTINGS_SECTIONS.firstOrNull { it.id == section }?.title ?: "Mat Launcher settings",
+                    style = MaterialTheme.typography.titleLarge,
+                )
             }
             Column(
                 Modifier
@@ -85,10 +100,15 @@ fun SettingsScreen(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                if (section == null) {
+                    SettingsMenu(updater, onOpen = { section = it })
+                }
+                if (section == "updates") {
                 // ---------------- Updates (top)
                 UpdateBanner(updater.installedLauncherVersion(LocalContext.current))
                 UpdateCard(updater, settings, weatherInstalled)
-
+                }
+                if (section == "wallpaper") {
                 // ---------------- Wallpaper
                 Header("Wallpaper")
                 Card {
@@ -102,7 +122,8 @@ fun SettingsScreen(
                         color = scheme.onSurfaceVariant,
                     )
                 }
-
+                }
+                if (section == "icons") {
                 // ---------------- Icons
                 Header("Icons")
                 Card {
@@ -135,7 +156,8 @@ fun SettingsScreen(
                         color = scheme.onSurfaceVariant,
                     )
                 }
-
+                }
+                if (section == "home") {
                 // ---------------- Home
                 Header("Home & widgets")
                 Card {
@@ -177,7 +199,8 @@ fun SettingsScreen(
 
                 Header("Top bar")
                 TopBarSettings(settings)
-
+                }
+                if (section == "lock") {
                 // ---------------- Lock
                 Header("Lock screen")
                 Card {
@@ -203,13 +226,15 @@ fun SettingsScreen(
 
                 Header("Lock screen look")
                 LockLookSettings(settings)
-
+                }
+                if (section == "cc") {
                 Header("Control center")
                 ControlCenterSettings(settings)
 
                 Header("Over other apps")
                 OverlaySettings(settings)
-
+                }
+                if (section == "apps") {
                 // ---------------- Apps
                 Header("Apps")
                 Card {
@@ -232,10 +257,12 @@ fun SettingsScreen(
                         FilledTonalButton(onClick = actions.setDefaultLauncher) { Text("Set") }
                     }
                 }
-
+                }
+                if (section == "perms") {
                 Header("Permissions")
                 Card { PermissionRows() }
-
+                }
+                if (section == "about") {
                 Header("Welcome screen")
                 Card {
                     FilledTonalButton(onClick = { settings.onboarded = false; onBack() }) { Text("Run setup again") }
@@ -249,6 +276,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,
                     )
+                }
                 }
                 Spacer(Modifier.height(24.dp))
                 Box(Modifier.navigationBarsPadding())
@@ -449,4 +477,46 @@ fun WallpaperGalleryDialog(onPick: (WallpaperPreset) -> Unit, onFromGallery: () 
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
     )
+}
+
+
+internal class SettingsSection(val id: String, val title: String, val sub: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+
+internal val SETTINGS_SECTIONS = listOf(
+    SettingsSection("updates", "Updates", "Check for a new version", Icons.Rounded.SystemUpdate),
+    SettingsSection("wallpaper", "Wallpaper", "Gallery or Material gradients", Icons.Rounded.Wallpaper),
+    SettingsSection("icons", "Icons", "Style, shape, size, grid", Icons.Rounded.Palette),
+    SettingsSection("home", "Home & widgets", "Widgets, pages, top bar, weather", Icons.Rounded.Widgets),
+    SettingsSection("lock", "Lock screen", "PIN, look, lock over apps", Icons.Rounded.Lock),
+    SettingsSection("cc", "Control center", "Tiles, sliders, over other apps", Icons.Rounded.Tune),
+    SettingsSection("apps", "Apps", "Mat Weather, default launcher", Icons.Rounded.Apps),
+    SettingsSection("perms", "Permissions", "Access Mat Launcher can use", Icons.Rounded.Security),
+    SettingsSection("about", "Setup & about", "Run setup again, version", Icons.Rounded.Info),
+)
+
+@Composable
+private fun SettingsMenu(updater: com.matlauncher.app.util.Updater, onOpen: (String) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Box(Modifier.clickable { onOpen("updates") }) {
+        UpdateBanner(updater.installedLauncherVersion(LocalContext.current))
+    }
+    SETTINGS_SECTIONS.forEach { sec ->
+        Surface(
+            onClick = { onOpen(sec.id) },
+            shape = RoundedCornerShape(24.dp),
+            color = scheme.surfaceContainer,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(16.dp), color = scheme.primaryContainer) {
+                    Icon(sec.icon, null, Modifier.padding(10.dp), tint = scheme.onPrimaryContainer)
+                }
+                Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                    Text(sec.title, style = MaterialTheme.typography.titleMedium)
+                    Text(sec.sub, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                }
+                Icon(Icons.Rounded.ChevronRight, null, tint = scheme.onSurfaceVariant)
+            }
+        }
+    }
 }
