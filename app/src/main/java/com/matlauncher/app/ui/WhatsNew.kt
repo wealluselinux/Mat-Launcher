@@ -101,6 +101,11 @@ val NEW_FEATURES = listOf(
         "In edit mode, drop an app onto the middle of another app to make a folder. Tap a folder to open it, rename it, or take apps back out.",
         Icons.Rounded.Folder,
     ),
+    NewFeature(
+        "1.7.0", "New icons and a redesigned Mat Weather",
+        "Mat Launcher and Mat Weather have new Material You icons: dark, with an outlined home (or a sun and cloud) and cookie shapes in the corners. Mat Weather also has a new look with an hourly forecast, 7-day range bars and a new details grid. Both icons support themed (monochrome) icons.",
+        Icons.Rounded.AutoAwesome,
+    ),
 )
 
 fun newFeaturesSince(lastSeen: String): List<NewFeature> =

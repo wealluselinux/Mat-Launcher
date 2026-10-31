@@ -73,6 +73,30 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.Umbrella
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -168,6 +192,26 @@ private fun dayName(date: String, index: Int): String {
     }
 }
 
+/** The scalloped "cookie" shape from Material 3 Expressive. */
+class CookieShape(private val lobes: Int = 9, private val amp: Float = 0.06f) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val path = Path()
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val r = minOf(cx, cy) / (1f + amp)
+        val steps = 180
+        for (i in 0..steps) {
+            val t = (i.toFloat() / steps) * (2f * Math.PI.toFloat())
+            val rad = r * (1f + amp * cos(lobes * t))
+            val x = cx + rad * cos(t)
+            val y = cy + rad * sin(t)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        return Outline.Generic(path)
+    }
+}
+
 @Composable
 fun WeatherScreen(
     city: String,
@@ -192,97 +236,193 @@ fun WeatherScreen(
         loading = false
     }
 
+    val spin = rememberInfiniteTransition(label = "spin")
+    val rot by spin.animateFloat(0f, 360f, infiniteRepeatable(tween(60_000, easing = LinearEasing)), label = "rot")
+
     Box(Modifier.fillMaxSize().background(scheme.surface)) {
+        // soft tint at the top, fading into the surface
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(360.dp)
+                .background(Brush.verticalGradient(listOf(scheme.primaryContainer.copy(alpha = 0.55f), scheme.surface)))
+        )
         Column(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = scheme.secondaryContainer,
-                    contentColor = scheme.onSecondaryContainer,
+                    color = scheme.surfaceContainerHighest,
+                    contentColor = scheme.onSurface,
                     modifier = Modifier.weight(1f).clickable { search = true },
                 ) {
-                    Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(horizontal = 18.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Search, null)
                         Spacer(Modifier.size(10.dp))
-                        Text(city, style = MaterialTheme.typography.titleMedium)
+                        Text(city, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                     }
                 }
-                IconButton(onClick = { reload++ }) { Icon(Icons.Rounded.Refresh, "Refresh") }
+                Spacer(Modifier.size(6.dp))
+                Surface(shape = CircleShape, color = scheme.secondaryContainer, contentColor = scheme.onSecondaryContainer) {
+                    IconButton(onClick = { reload++ }) { Icon(Icons.Rounded.Refresh, "Refresh") }
+                }
             }
 
             val w = data
             if (w == null) {
-                Text(
-                    if (loading) "Loading…" else "Couldn't load the weather. Check your connection.",
-                    modifier = Modifier.padding(32.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Column(Modifier.fillMaxWidth().padding(48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (loading) CircularProgressIndicator()
+                    else Text("Couldn't load the weather. Check your connection.", style = MaterialTheme.typography.titleMedium)
+                }
             } else {
-                // hero
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(48.dp),
-                    color = scheme.primaryContainer,
-                    contentColor = scheme.onPrimaryContainer,
+                // ---- hero
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(48.dp))
+                        .background(scheme.primaryContainer)
                 ) {
+                    Box(
+                        Modifier
+                            .size(240.dp)
+                            .align(Alignment.TopEnd)
+                            .offset(x = 70.dp, y = (-70).dp)
+                            .graphicsLayer { rotationZ = rot }
+                            .clip(CookieShape(9, 0.07f))
+                            .background(scheme.primary.copy(alpha = 0.14f))
+                    )
+                    Box(
+                        Modifier
+                            .size(170.dp)
+                            .align(Alignment.BottomStart)
+                            .offset(x = (-60).dp, y = 60.dp)
+                            .graphicsLayer { rotationZ = -rot }
+                            .clip(CookieShape(7, 0.08f))
+                            .background(scheme.tertiary.copy(alpha = 0.16f))
+                    )
                     Column(
-                        Modifier.fillMaxWidth().padding(28.dp),
+                        Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 28.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(
-                            Modifier.size(96.dp).clip(CircleShape).background(scheme.primary.copy(alpha = 0.16f)),
+                            Modifier.size(112.dp).clip(CookieShape(9, 0.07f)).background(scheme.primary),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Icon(iconFor(w.code, w.isDay), null, Modifier.size(56.dp))
+                            Icon(iconFor(w.code, w.isDay), null, Modifier.size(58.dp), tint = scheme.onPrimary)
                         }
                         Text(
                             tempString(w.tempC, fahrenheit),
-                            fontSize = 92.sp,
-                            lineHeight = 96.sp,
-                            fontWeight = FontWeight.Light,
+                            fontSize = 96.sp,
+                            lineHeight = 100.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = scheme.onPrimaryContainer,
                         )
-                        Text(conditionLabel(w.code), style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            conditionLabel(w.code),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = scheme.onPrimaryContainer,
+                        )
                         w.days.firstOrNull()?.let {
-                            Text(
-                                "H ${tempString(it.hiC, fahrenheit)}   L ${tempString(it.loC, fahrenheit)}",
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
+                            Spacer(Modifier.height(12.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Pill(Icons.Rounded.ArrowUpward, tempString(it.hiC, fahrenheit))
+                                Pill(Icons.Rounded.ArrowDownward, tempString(it.loC, fahrenheit))
+                            }
                         }
                     }
                 }
 
+                // ---- hourly
+                if (w.hours.isNotEmpty()) {
+                    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(36.dp), color = scheme.surfaceContainer) {
+                        Column(Modifier.padding(vertical = 16.dp)) {
+                            Text("Next 24 hours", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.titleMedium)
+                            Spacer(Modifier.height(10.dp))
+                            Row(
+                                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                w.hours.forEachIndexed { i, h ->
+                                    val now = i == 0
+                                    Column(
+                                        Modifier
+                                            .clip(RoundedCornerShape(28.dp))
+                                            .background(if (now) scheme.primaryContainer else Color.Transparent)
+                                            .padding(horizontal = 12.dp, vertical = 12.dp)
+                                            .width(44.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        Text(h.label, style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant, maxLines = 1)
+                                        Icon(iconFor(h.code, h.isDay), null, Modifier.size(26.dp), tint = if (now) scheme.onPrimaryContainer else scheme.primary)
+                                        Text(tempString(h.tempC, fahrenheit), style = MaterialTheme.typography.titleSmall)
+                                        Text(
+                                            if (h.precipPct >= 20) "${h.precipPct}%" else " ",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = scheme.tertiary,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ---- details
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Detail(Icons.Rounded.Thermostat, "Feels like", tempString(w.feelsC, fahrenheit), Modifier.weight(1f))
                     Detail(Icons.Rounded.WaterDrop, "Humidity", "${w.humidity}%", Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Detail(
                         Icons.Rounded.Air, "Wind",
                         if (fahrenheit) "${(w.windKmh * 0.621371).toInt()} mph" else "${w.windKmh.toInt()} km/h",
                         Modifier.weight(1f),
                     )
+                    Detail(Icons.Rounded.Umbrella, "Rain chance", "${w.precipPct}%", Modifier.weight(1f))
                 }
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(32.dp),
-                    color = scheme.surfaceContainer,
-                ) {
-                    Column(Modifier.padding(vertical = 8.dp)) {
+                // ---- daily
+                val lo = w.days.minOfOrNull { it.loC } ?: 0.0
+                val hi = w.days.maxOfOrNull { it.hiC } ?: 1.0
+                val span = (hi - lo).takeIf { it > 0.1 } ?: 1.0
+                Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(36.dp), color = scheme.surfaceContainer) {
+                    Column(Modifier.padding(vertical = 10.dp)) {
+                        Text("7-day forecast", Modifier.padding(horizontal = 20.dp, vertical = 6.dp), style = MaterialTheme.typography.titleMedium)
                         w.days.forEachIndexed { i, d ->
+                            val start = ((d.loC - lo) / span).toFloat().coerceIn(0f, 1f)
+                            val width = ((d.hiC - d.loC) / span).toFloat().coerceAtLeast(0.06f).coerceAtMost(1f - start).coerceAtLeast(0.02f)
+                            val rest = 1f - start - width
                             Row(
-                                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                                Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(dayName(d.date, i), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                                Text(dayName(d.date, i), Modifier.weight(1.1f), style = MaterialTheme.typography.bodyLarge)
                                 Icon(iconFor(d.code, true), null, Modifier.size(24.dp), tint = scheme.primary)
                                 Text(
-                                    "  ${tempString(d.hiC, fahrenheit)} / ${tempString(d.loC, fahrenheit)}",
+                                    tempString(d.loC, fahrenheit),
+                                    Modifier.width(48.dp),
+                                    textAlign = TextAlign.End,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = scheme.onSurfaceVariant,
+                                )
+                                Row(
+                                    Modifier.weight(1.3f).height(8.dp).clip(CircleShape).background(scheme.surfaceContainerHighest),
+                                ) {
+                                    if (start > 0.001f) Spacer(Modifier.weight(start))
+                                    Box(Modifier.weight(width).fillMaxHeight().clip(CircleShape).background(scheme.primary))
+                                    if (rest > 0.001f) Spacer(Modifier.weight(rest))
+                                }
+                                Text(
+                                    tempString(d.hiC, fahrenheit),
+                                    Modifier.width(48.dp),
+                                    textAlign = TextAlign.Start,
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
                             }
@@ -310,18 +450,32 @@ fun WeatherScreen(
 }
 
 @Composable
+private fun Pill(icon: ImageVector, text: String) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(50), color = scheme.surface.copy(alpha = 0.55f), contentColor = scheme.onPrimaryContainer) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(18.dp))
+            Spacer(Modifier.size(4.dp))
+            Text(text, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
 private fun Detail(icon: ImageVector, label: String, value: String, modifier: Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(28.dp),
-        color = scheme.tertiaryContainer,
-        contentColor = scheme.onTertiaryContainer,
-    ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Icon(icon, null, Modifier.size(22.dp))
-            Text(value, style = MaterialTheme.typography.titleMedium)
-            Text(label, style = MaterialTheme.typography.labelSmall)
+    Surface(modifier = modifier, shape = RoundedCornerShape(32.dp), color = scheme.surfaceContainer) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier.size(46.dp).clip(CookieShape(8, 0.07f)).background(scheme.tertiaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, null, Modifier.size(22.dp), tint = scheme.onTertiaryContainer)
+            }
+            Column(Modifier.padding(start = 12.dp)) {
+                Text(value, style = MaterialTheme.typography.titleMedium)
+                Text(label, style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+            }
         }
     }
 }

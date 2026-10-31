@@ -8,6 +8,8 @@ import java.net.URL
 import java.net.URLEncoder
 import kotlin.math.roundToInt
 
+data class HourForecast(val label: String, val tempC: Double, val code: Int, val isDay: Boolean, val precipPct: Int)
+
 data class DayForecast(val date: String, val code: Int, val hiC: Double, val loC: Double)
 
 data class WeatherData(
@@ -19,6 +21,7 @@ data class WeatherData(
     val isDay: Boolean,
     val precipPct: Int,
     val days: List<DayForecast>,
+    val hours: List<HourForecast> = emptyList(),
 )
 
 data class GeoResult(val name: String, val admin: String, val country: String, val lat: Double, val lon: Double) {
@@ -68,6 +71,7 @@ object WeatherApi {
         try {
             val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
                 "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day" +
+                "&hourly=temperature_2m,weather_code,precipitation_probability,is_day" +
                 "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=7"
             val o = JSONObject(get(url))
             val cur = o.getJSONObject("current")
@@ -80,6 +84,29 @@ object WeatherApi {
             val days = (0 until dates.length()).map {
                 DayForecast(dates.getString(it), codes.getInt(it), his.getDouble(it), los.getDouble(it))
             }
+            val hours = try {
+                val h = o.getJSONObject("hourly")
+                val times = h.getJSONArray("time")
+                val ht = h.getJSONArray("temperature_2m")
+                val hc = h.getJSONArray("weather_code")
+                val hp = h.optJSONArray("precipitation_probability")
+                val hd = h.optJSONArray("is_day")
+                val now = cur.optString("time").take(13)
+                val start = (0 until times.length()).firstOrNull { times.getString(it).take(13) >= now } ?: 0
+                (start until minOf(start + 24, times.length())).mapIndexed { n, i ->
+                    val hr = times.getString(i).substring(11, 13).toInt()
+                    val label = if (n == 0) "Now" else "${if (hr % 12 == 0) 12 else hr % 12} ${if (hr < 12) "AM" else "PM"}"
+                    HourForecast(
+                        label,
+                        ht.getDouble(i),
+                        hc.getInt(i),
+                        hd == null || hd.optInt(i, 1) == 1,
+                        if (hp != null && !hp.isNull(i)) hp.getInt(i) else 0,
+                    )
+                }
+            } catch (e: Exception) {
+                emptyList()
+            }
             WeatherData(
                 tempC = cur.getDouble("temperature_2m"),
                 feelsC = cur.getDouble("apparent_temperature"),
@@ -89,6 +116,7 @@ object WeatherApi {
                 isDay = cur.getInt("is_day") == 1,
                 precipPct = if (precip != null && precip.length() > 0 && !precip.isNull(0)) precip.getInt(0) else 0,
                 days = days,
+                hours = hours,
             )
         } catch (e: Exception) {
             null

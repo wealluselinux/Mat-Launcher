@@ -26,7 +26,7 @@ A **Material You (Material 3) only** Android launcher, inspired by Void Launcher
 - **Mat AI**: built-in assistant. It is rule-based (no real LLM, by design) and can chain several commands in one message ("turn off wifi, flashlight on, then open YouTube"): open apps, flashlight, Do Not Disturb, silent / vibrate / normal mode, brightness, volume, weather, battery, math, web search, and icon style commands. Wi-Fi, Bluetooth, airplane mode and mobile data switching needs the optional [Shizuku](https://shizuku.rikka.app/) app
 - **Icon customization**: shapes (circle, squircle, rounded, teardrop), styles (original, **match wallpaper**, **transparent**, glass), size, labels, and per-app custom icon images or names
 - **Wallpaper**: pick from your gallery or from built-in Material gradients
-- **Mat Weather**: a separate Material You weather app (Open-Meteo, no API key) bundled inside the launcher APK
+- **Mat Weather**: a separate Material You weather app (Open-Meteo, no API key) with hourly and 7-day forecasts, bundled inside the launcher APK
 
 > **About the bundled weather app:** Android doesn't allow an app to silently install another one. Mat Launcher offers to install Mat Weather on first run (and from Settings → Apps); you confirm in the system installer.
 
