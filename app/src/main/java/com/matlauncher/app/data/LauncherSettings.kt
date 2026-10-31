@@ -68,6 +68,10 @@ class StatePref<T>(
 }
 
 class LauncherSettings(private val context: Context) {
+    companion object {
+        const val MAX_PAGES = 5
+    }
+
     private val sp: SharedPreferences =
         context.getSharedPreferences("mat_launcher", Context.MODE_PRIVATE)
 
@@ -111,9 +115,9 @@ class LauncherSettings(private val context: Context) {
 
     fun hasBuiltin(kind: HomeKind): Boolean = homeItems.any { it.kind == kind }
 
-    fun setBuiltin(kind: HomeKind, on: Boolean) {
+    fun setBuiltin(kind: HomeKind, on: Boolean, page: Int = 0) {
         val cur = homeItems
-        if (on && cur.none { it.kind == kind }) setHomeItems(cur + defaultItem(kind))
+        if (on && cur.none { it.kind == kind }) setHomeItems(cur + defaultItem(kind).copy(page = page))
         else if (!on) setHomeItems(cur.filter { it.kind != kind })
     }
 
@@ -127,7 +131,39 @@ class LauncherSettings(private val context: Context) {
         get() = hasBuiltin(HomeKind.PHOTO)
         set(v) = setBuiltin(HomeKind.PHOTO, v)
 
-    fun resetLayout() { layoutRaw = initialLayout(ignoreSaved = true) }
+    // ---- home pages ----
+    private var pageCountRaw by intPref("pageCount", 2)
+    val pageCount: Int get() = pageCountRaw.coerceIn(1, MAX_PAGES)
+
+    fun pageOf(item: HomeItem): Int = item.page.coerceIn(0, pageCount - 1)
+
+    fun addPage(): Boolean {
+        if (pageCount >= MAX_PAGES) return false
+        pageCountRaw = pageCount + 1
+        return true
+    }
+
+    /** Removes page [index]; its widgets move to the page before it. */
+    fun removePage(index: Int) {
+        if (pageCount <= 1 || index !in 0 until pageCount) return
+        val target = if (index > 0) index - 1 else 0
+        setHomeItems(
+            homeItems.map {
+                val p = pageOf(it)
+                when {
+                    p == index -> it.copy(page = target)
+                    p > index -> it.copy(page = p - 1)
+                    else -> it.copy(page = p)
+                }
+            }
+        )
+        pageCountRaw = pageCount - 1
+    }
+
+    fun resetLayout() {
+        layoutRaw = initialLayout(ignoreSaved = true)
+        pageCountRaw = 2
+    }
 
     private fun defaultItem(kind: HomeKind): HomeItem = when (kind) {
         HomeKind.CLOCK -> HomeItem(kind, half = true)
@@ -141,8 +177,8 @@ class LauncherSettings(private val context: Context) {
         val legacy = !ignoreSaved
         if (!legacy || sp.getBoolean("showWeather", true)) items += defaultItem(HomeKind.WEATHER)
         if (!legacy || sp.getBoolean("showClock", true)) items += defaultItem(HomeKind.CLOCK)
-        if (!legacy || sp.getBoolean("showPhoto", true)) items += defaultItem(HomeKind.PHOTO)
-        items += defaultItem(HomeKind.AI)
+        if (!legacy || sp.getBoolean("showPhoto", true)) items += defaultItem(HomeKind.PHOTO).copy(page = 1)
+        items += defaultItem(HomeKind.AI).copy(page = 1)
         if (legacy) {
             split(sp.getString("widgetIds", "") ?: "").mapNotNull { it.toIntOrNull() }.forEach {
                 items += HomeItem(HomeKind.HOSTED, it)

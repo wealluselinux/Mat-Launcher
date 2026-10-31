@@ -7,7 +7,7 @@ A **Material You (Material 3) only** Android launcher, inspired by Void Launcher
 ## Features
 
 - **Material You everywhere**: dynamic color on Android 12+, wallpaper-derived colors on older versions
-- **Home**: a single editable home screen. Built-in clock, weather, photo and Ask Mat AI widgets sit next to widgets from your other apps. Long-press the home screen, then **Edit home** to move, resize (half / full width, any height) or remove each one
+- **Home**: up to five swipeable pages that you can add, remove and rearrange. Each is an editable layout. Built-in clock, weather, photo and Ask Mat AI widgets sit next to widgets from your other apps. Long-press the home screen, then **Edit home** to move, resize (half / full width, any height) or remove each one
 - **Widgets**: add any Android widget from any app. The picker lists apps first; tap an app to expand its widgets with previews, so apps with hundreds of widgets don't bury the rest. The built-in widgets can be restyled (clock: stacked / digital / analog / minimal, weather: card / pill / minimal, photos: rounded / cookie / circle)
 - **App drawer**: swipe up, search, long-press for rename / change icon / hide / uninstall / app info
 - **Control center**: swipe down (or from the very top). Choose which tiles to show and their order, large or compact style, and toggle the clock header, brightness, volume and shortcuts. Real flashlight and volume; Wi-Fi, Bluetooth, Airplane and Location open the system panels (Android doesn't let apps flip them)
@@ -16,7 +16,7 @@ A **Material You (Material 3) only** Android launcher, inspired by Void Launcher
 - **First-run welcome**: guided setup for icons, widgets, lock screen and permissions, with a transition to the home screen
 - **Google Sans** font and an app-open animation
 - **Updates**: Settings → Updates checks the latest GitHub release, downloads it and opens the system installer, updating Mat Weather too
-- **Mat AI**: built-in assistant. It is rule-based (no real LLM, by design): open apps, weather, battery, flashlight, math, jokes, web search, and "transparent icons" style commands
+- **Mat AI**: built-in assistant. It is rule-based (no real LLM, by design) and can chain several commands in one message ("turn off wifi, flashlight on, then open YouTube"): open apps, flashlight, Do Not Disturb, silent / vibrate / normal mode, brightness, volume, weather, battery, math, web search, and icon style commands. Wi-Fi, Bluetooth, airplane mode and mobile data switching needs the optional [Shizuku](https://shizuku.rikka.app/) app
 - **Icon customization**: shapes (circle, squircle, rounded, teardrop), styles (original, **match wallpaper**, **transparent**, glass), size, labels, and per-app custom icon images or names
 - **Wallpaper**: pick from your gallery or from built-in Material gradients
 - **Mat Weather**: a separate Material You weather app (Open-Meteo, no API key) bundled inside the launcher APK

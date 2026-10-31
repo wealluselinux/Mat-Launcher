@@ -54,7 +54,7 @@ fun AiChat(host: AiHost, initialQuery: String?, onClose: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val messages = remember {
         mutableStateListOf(
-            Msg(false, "Hi, I'm Mat AI. I live inside your launcher and can open apps, check the weather, do math, toggle the flashlight and restyle your icons.")
+            Msg(false, "Hi, I'm Mat AI. I can chain commands, like \"flashlight on, silent mode, open YouTube\". Say \"help\" to see everything.")
         )
     }
     var input by remember { mutableStateOf("") }
@@ -68,10 +68,25 @@ fun AiChat(host: AiHost, initialQuery: String?, onClose: () -> Unit) {
         input = ""
         scope.launch {
             delay(350)
-            val r = MatAi.reply(t, host)
-            messages.add(Msg(false, r.text))
-            listState.animateScrollToItem(messages.lastIndex)
-            r.action?.invoke()
+            val steps = MatAi.plan(t, host)
+            for (step in steps) {
+                val run = step.run
+                if (run == null) {
+                    if (step.text.isNotEmpty()) messages.add(Msg(false, step.text))
+                } else if (step.launch) {
+                    // say it first: opening an app leaves the launcher
+                    messages.add(Msg(false, step.text))
+                    listState.animateScrollToItem(messages.lastIndex)
+                    delay(250)
+                    run()
+                } else {
+                    val result = try { run() } catch (e: Exception) { "That didn't work." }
+                    val shown = result.ifEmpty { step.text }
+                    if (shown.isNotEmpty()) messages.add(Msg(false, shown))
+                }
+                listState.animateScrollToItem(messages.lastIndex)
+                if (steps.size > 1) delay(250)
+            }
         }
     }
 

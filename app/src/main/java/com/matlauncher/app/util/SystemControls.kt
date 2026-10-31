@@ -11,6 +11,14 @@ import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.net.wifi.WifiManager
+import android.widget.Toast
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -23,12 +31,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.math.roundToInt
 
+enum class RingerMode(val label: String) { NORMAL("Ring"), VIBRATE("Vibrate"), SILENT("Silent") }
+
 /** Reads and toggles the bits of system state the control center shows. */
 class SystemControls(private val ctx: Context) {
     private val cam = ctx.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     private val audio = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var torchId: String? = null
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    var wifiOn by mutableStateOf(false)
+        private set
+    var ringer by mutableStateOf(RingerMode.NORMAL)
+        private set
     var torchOn by mutableStateOf(false)
         private set
     var netLabel by mutableStateOf("Off")
@@ -106,6 +122,16 @@ class SystemControls(private val ctx: Context) {
         } catch (e: Exception) {
             netLabel = "Unknown"
         }
+        wifiOn = try {
+            ctx.applicationContext.getSystemService(WifiManager::class.java).isWifiEnabled
+        } catch (e: Exception) {
+            false
+        }
+        ringer = when (audio.ringerMode) {
+            AudioManager.RINGER_MODE_SILENT -> RingerMode.SILENT
+            AudioManager.RINGER_MODE_VIBRATE -> RingerMode.VIBRATE
+            else -> RingerMode.NORMAL
+        }
         val cr = ctx.contentResolver
         bluetoothOn = Settings.Global.getInt(cr, "bluetooth_on", 0) == 1
         airplaneOn = Settings.Global.getInt(cr, Settings.Global.AIRPLANE_MODE_ON, 0) == 1
@@ -169,16 +195,111 @@ class SystemControls(private val ctx: Context) {
         refresh()
     }
 
-    fun toggleDnd() {
-        val nm = ctx.getSystemService(NotificationManager::class.java)
-        if (!nm.isNotificationPolicyAccessGranted) {
+    fun toggleDnd() { setDnd(!dndOn) }
+
+    private fun policyGranted(): Boolean = try {
+        ctx.getSystemService(NotificationManager::class.java).isNotificationPolicyAccessGranted
+    } catch (e: Exception) {
+        false
+    }
+
+    private val needPolicy =
+        "I need Do Not Disturb (Modes) access first. I opened that screen: switch Mat Launcher on, then ask again."
+
+    fun setDnd(on: Boolean): String {
+        if (!policyGranted()) {
             open(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
-            return
+            return needPolicy
         }
-        nm.setInterruptionFilter(
-            if (dndOn) NotificationManager.INTERRUPTION_FILTER_ALL else NotificationManager.INTERRUPTION_FILTER_NONE
-        )
+        return try {
+            ctx.getSystemService(NotificationManager::class.java).setInterruptionFilter(
+                if (on) NotificationManager.INTERRUPTION_FILTER_PRIORITY else NotificationManager.INTERRUPTION_FILTER_ALL
+            )
+            refresh()
+            "Do Not Disturb ${if (on) "on" else "off"}."
+        } catch (e: Exception) {
+            "Couldn't change Do Not Disturb."
+        }
+    }
+
+    fun setRinger(mode: RingerMode): String {
+        if (mode == RingerMode.SILENT && !policyGranted()) {
+            open(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+            return "Silent mode needs Do Not Disturb (Modes) access first. I opened that screen: switch Mat Launcher on, then ask again."
+        }
+        return try {
+            audio.ringerMode = when (mode) {
+                RingerMode.NORMAL -> AudioManager.RINGER_MODE_NORMAL
+                RingerMode.VIBRATE -> AudioManager.RINGER_MODE_VIBRATE
+                RingerMode.SILENT -> AudioManager.RINGER_MODE_SILENT
+            }
+            refresh()
+            "Sound mode: ${mode.label.lowercase()}."
+        } catch (e: Exception) {
+            "Couldn't change the sound mode."
+        }
+    }
+
+    fun setBrightnessPercent(p: Int): String {
+        val v = p.coerceIn(1, 100) / 100f
+        return if (setBrightness(v)) "Brightness $p%." else "I need \"Modify system settings\" first. I opened that screen: switch Mat Launcher on, then ask again."
+    }
+
+    fun setVolumePercent(p: Int): String {
+        changeVolume(p.coerceIn(0, 100) / 100f)
+        return "Volume $p%."
+    }
+
+    fun setRotation(auto: Boolean): String {
+        if (!Settings.System.canWrite(ctx)) {
+            openWriteSettings()
+            return "I need \"Modify system settings\" first. I opened that screen: switch Mat Launcher on, then ask again."
+        }
+        Settings.System.putInt(ctx.contentResolver, Settings.System.ACCELEROMETER_ROTATION, if (auto) 1 else 0)
         refresh()
+        return "Auto-rotate ${if (auto) "on" else "off"}."
+    }
+
+    // ---- Wi-Fi / Bluetooth / airplane / mobile data: only possible through Shizuku ----
+
+    val shellReady: Boolean get() = ShellAccess.granted()
+
+    /** Runs [block] on the main scope (used by tiles, which can't suspend). */
+    fun async(block: suspend () -> String) { scope.launch { block() } }
+
+    private suspend fun shellToggle(label: String, on: Boolean, cmds: List<List<String>>, fallback: () -> Unit): String {
+        if (!ShellAccess.granted()) {
+            fallback()
+            return "Android doesn't let apps switch $label directly, so I opened its screen instead. " +
+                "To let me do it, turn on Shizuku in Settings → Permissions."
+        }
+        val ok = withContext(Dispatchers.IO) { cmds.all { ShellAccess.run(it) } }
+        delay(700)
+        refresh()
+        return if (ok) "$label ${if (on) "on" else "off"}." else "Shizuku wouldn't run that for $label."
+    }
+
+    suspend fun setWifi(on: Boolean): String =
+        shellToggle("Wi-Fi", on, listOf(listOf("svc", "wifi", if (on) "enable" else "disable"))) { openInternetPanel() }
+
+    suspend fun setBluetooth(on: Boolean): String =
+        shellToggle("Bluetooth", on, listOf(listOf("svc", "bluetooth", if (on) "enable" else "disable"))) { openBluetooth() }
+
+    suspend fun setMobileData(on: Boolean): String =
+        shellToggle("Mobile data", on, listOf(listOf("svc", "data", if (on) "enable" else "disable"))) {
+            open(Settings.ACTION_DATA_ROAMING_SETTINGS)
+        }
+
+    suspend fun setAirplane(on: Boolean): String {
+        val cmds = if (Build.VERSION.SDK_INT >= 30) {
+            listOf(listOf("cmd", "connectivity", "airplane-mode", if (on) "enable" else "disable"))
+        } else {
+            listOf(
+                listOf("settings", "put", "global", "airplane_mode_on", if (on) "1" else "0"),
+                listOf("am", "broadcast", "-a", "android.intent.action.AIRPLANE_MODE", "--ez", "state", if (on) "true" else "false"),
+            )
+        }
+        return shellToggle("Airplane mode", on, cmds) { openAirplane() }
     }
 
     fun openInternetPanel() {

@@ -76,11 +76,12 @@ fun MatApp(activity: MainActivity) {
     var launching by remember { mutableStateOf<LaunchRequest?>(null) }
     val sys = remember { SystemControls(ctx) }
     var editing by remember { mutableStateOf(false) }
+    var homePage by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val updater = remember { Updater() }
     var updateNotice by remember { mutableStateOf(false) }
 
     val addHosted = rememberWidgetAdder(activity.widgetHost) { id, _ ->
-        settings.setHomeItems(settings.homeItems + HomeItem(HomeKind.HOSTED, id))
+        settings.setHomeItems(settings.homeItems + HomeItem(HomeKind.HOSTED, id, page = homePage))
         overlay = Overlay.None
         editing = true
     }
@@ -248,6 +249,7 @@ fun MatApp(activity: MainActivity) {
         openWallpaper = { overlay = Overlay.None; showWallpapers = true },
         openSettings = { overlay = Overlay.Settings },
         lockNow = { actions.lockNow() },
+        sys = sys,
         openUrl = { url ->
             try {
                 ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -275,6 +277,7 @@ fun MatApp(activity: MainActivity) {
             HomeScreen(
                 repo.apps, settings, weather, actions, activity.homeSignal.intValue, activity.widgetHost,
                 editing = editing, onEditingChange = { editing = it },
+                onPageChanged = { homePage = it },
             )
 
             AnimatedVisibility(
@@ -327,7 +330,7 @@ fun MatApp(activity: MainActivity) {
                     onClose = { overlay = Overlay.None },
                     onPickHosted = { info -> addHosted(info) },
                     onPickBuiltin = { kind ->
-                        settings.setBuiltin(kind, true)
+                        settings.setBuiltin(kind, true, homePage)
                         overlay = Overlay.None
                         editing = true
                     },

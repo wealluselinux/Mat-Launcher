@@ -18,10 +18,11 @@ data class HomeItem(
     val id: Int = 0,
     val half: Boolean = false,
     val height: Int = 0,
+    val page: Int = 0,
 ) {
     val key: String get() = "${kind.name}:$id"
 
-    fun encode(): String = "${kind.name},$id,${if (half) 1 else 0},$height"
+    fun encode(): String = "${kind.name},$id,${if (half) 1 else 0},$height,$page"
 
     companion object {
         private fun decode(s: String): HomeItem? {
@@ -29,7 +30,7 @@ data class HomeItem(
             if (p.size < 4) return null
             val kind = HomeKind.values().firstOrNull { it.name == p[0] } ?: return null
             val id = p[1].toIntOrNull() ?: return null
-            return HomeItem(kind, id, p[2] == "1", p[3].toIntOrNull() ?: 0)
+            return HomeItem(kind, id, p[2] == "1", p[3].toIntOrNull() ?: 0, p.getOrNull(4)?.toIntOrNull() ?: 0)
         }
 
         fun parse(raw: String): List<HomeItem> =
@@ -83,6 +84,7 @@ enum class TileId(val label: String, val onLock: Boolean) {
     ROTATION("Auto-rotate", true),
     DND("Do not disturb", true),
     LOCATION("Location", true),
+    SOUND("Sound mode", true),
     AI("Mat AI", false);
 
     companion object {
